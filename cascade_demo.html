@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Cascade - demo v3 - 46100 Lecture 6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{ --bg:#000; --ink:#FCFCFC; box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){ --bg:#000; --ink:#FCFCFC; } }
+:root[data-theme="light"],:root[data-theme="dark"]{ --bg:#000; --ink:#FCFCFC; }
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Press Start 2P","Courier New",monospace;font-size:11px;line-height:1.7}
+.wrap{max-width:1000px;margin:0 auto;padding:8px 10px 20px}
+.screen{position:relative;width:100%;aspect-ratio:16/9;background:#000;border:4px solid #FCFCFC;box-shadow:0 0 0 4px #000,0 0 0 8px #7C7C7C;touch-action:manipulation}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;cursor:pointer}
+.dialog{position:absolute;left:3%;right:3%;bottom:4%;background:#000;border:4px double #FCFCFC;padding:10px 12px;font-size:clamp(8px,1.5vw,12px);line-height:1.8}
+.dialog[hidden]{display:none}
+.dialog .txt{white-space:pre-wrap}
+.opts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.nes{font:inherit;font-size:clamp(8px,1.3vw,11px);background:#000;color:#FCFCFC;border:3px solid #FCFCFC;padding:6px 10px;cursor:pointer}
+.nes:hover,.nes:focus-visible{background:#FCFCFC;color:#000;outline:none}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.big{font:inherit;font-size:clamp(9px,1.6vw,13px);border:3px solid #000;box-shadow:0 0 0 3px #FCFCFC;padding:14px 16px;cursor:pointer;color:#000;touch-action:manipulation}
+.big.b0{background:#3CBCFC}.big.b1{background:#00E8D8}
+.big:disabled{opacity:.35}
+.hint{color:#BCBCBC;font-size:clamp(7px,1.1vw,9px);margin-top:10px;line-height:1.9}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="screen">
+    <canvas id="cv" width="384" height="216" aria-label="Three glass containers in a staircase: big, medium and small eddies, with a heat vent at the bottom"></canvas>
+    <div class="dialog" id="dlg" hidden><div class="txt" id="dtxt"></div><div class="opts" id="dopts"></div></div>
+  </div>
+  <div class="bar">
+    <button class="big b0" id="kA">A: BREAK A BIG EDDY</button>
+    <button class="big b1" id="kS">S: BREAK A MEDIUM EDDY</button>
+    <button class="nes" id="gam">Shear (Mann): off</button>
+    <button class="nes" id="speed">Speed: normal</button>
+    <button class="nes" id="mute">Sound: on</button>
+  </div>
+  <p class="hint">Click a glowing eddy to break it, or press A / S. Breaking too soon wastes energy and jams the key. Shear (Mann) stretches eddies for as long as they live. "Relaxed" slows everything by 40 % for testing.</p>
+</div>
+<script>
+/* ===== physics =====
+   Eddies of three sizes, a factor 4 apart. The ship drops BIG eddies at a steady energy rate eps.
+   An eddy can break only after its turnover time T ~ L^(2/3) eps^(-1/3) (its timer ring fills, then it glows).
+   Breaking a BIG eddy (9 energy units) makes 3 MEDIUM (3 units each); a MEDIUM makes 3 SMALL (1 unit).
+   SMALL eddies turn into heat by themselves after their turnover time (viscosity).
+   If each eddy is broken soon after it ripens, a container holds (energy flow) x (ripening time) (Little's law),
+   so the energy held per size goes as T ~ L^(2/3): the -5/3 spectrum, per band.                                   */
+const LV = [
+  { name: 'BIG', L: 320, r: 12, units: 9, col: '#3CBCFC', dim: '#1C6C9C' },
+  { name: 'MEDIUM', L: 80, r: 7, units: 3, col: '#00E8D8', dim: '#00807C' },
+  { name: 'SMALL', L: 20, r: 3.5, units: 1, col: '#BCBCBC', dim: '#7C7C7C' },   // and everything below: continues on its own
+];
+const TBIG = 3.0;                                                    // s, turnover time of BIG at eps = 1
+const BOX = [ { x: 22, y: 46, w: 128, h: 66, cap: 6 }, { x: 150, y: 104, w: 118, h: 56, cap: 14 }, { x: 262, y: 148, w: 76, h: 46, cap: 30 } ];
+const VENT = { x: 368, y: 186 };
+let slow = 1, muted = false, actx = null, GAMMA = 0;
+
+/* ===== sound ===== */
+function tone(f, dur = 0.12, vol = 0.08, type = 'square', delay = 0) {
+  if (muted) return; try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+  const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = f; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+document.getElementById('mute').onclick = e => { muted = !muted; e.target.textContent = 'Sound: ' + (muted ? 'off' : 'on'); };
+document.getElementById('gam').onclick = e => { GAMMA = GAMMA ? 0 : 3.9; e.target.textContent = `Shear (Mann): ${GAMMA ? 'on, Gamma 3.9' : 'off'}`; };
+document.getElementById('speed').onclick = e => { slow = slow === 1 ? 1.4 : 1; e.target.textContent = 'Speed: ' + (slow === 1 ? 'normal' : 'relaxed'); };
+
+/* ===== state ===== */
+let S = null;
+function newGame() {
+  S = { t: 0, eps: 1, eddies: [], sparks: [], pops: [], score: 0, spill: 0, dropClock: 0, stage: 1, gusted: false, running: false, done: false,
+        held: [0, 0, 0], heldT: 0, waste: 0, jam: [0, 0], stretch: [0, 0, 0], stretchW: [0, 0, 0], flow: [0, 0, 0, 0], flowT: 0, inRate: 0, outRate: 0, banner: '' };
+}
+const T = lv => TBIG * slow * Math.pow(LV[0].L / LV[lv].L, -2 / 3) * Math.pow(S.eps, -1 / 3);
+const dropEvery = () => (S.t < 10 * slow ? 3.0 : 2.0) * slow / S.eps;                       // one BIG eddy every 2 s: eps = 4.5 units/s
+const inBox = lv => S.eddies.filter(e => e.lv === lv && (e.state === 'in' || e.target === lv)).length;
+const rnd = (a, b) => a + (b - a) * Math.random();
+
+function spawn(lv, x0, y0) {
+  const b = BOX[lv];
+  if (inBox(lv) >= b.cap) {                                          // no room: the eddy spills over and its energy is lost
+    S.eddies.push({ lv, state: 'spill', x: x0, y: y0, vx: rnd(-20, 20), vy: -30, age: 0, spin: 0 });
+    S.spill += LV[lv].units; S.score = Math.max(0, S.score - 20);
+    S.pops.push({ txt: 'SPILL!', x: b.x + b.w / 2, y: b.y - 6, until: performance.now() + 700, col: '#F83800' }); tone(80, 0.15, 0.08, 'sawtooth');
+    return;
+  }
+  const tx = rnd(b.x + LV[lv].r + 3, b.x + b.w - LV[lv].r - 3), ty = rnd(b.y + LV[lv].r + 6, b.y + b.h - LV[lv].r - 3);
+  S.eddies.push({ lv, state: 'fall', target: lv, x0, y0, x: x0, y: y0, tx, ty, ft: 0, age: 0, spin: rnd(0, 6), vx: rnd(-6, 6), vy: rnd(-4, 4) });
+}
+function breakEddy(e, byPlayer) {
+  e.state = 'gone';
+  const n = 3;
+  for (let i = 0; i < n; i++) spawn(e.lv + 1, e.x + rnd(-4, 4), e.y + rnd(-4, 4));
+  S.flow[e.lv + 1] += LV[e.lv].units;
+  if (byPlayer) { S.score += 10; tone(e.lv === 0 ? 196 : 392, 0.12, 0.09); }
+  for (let i = 0; i < 6; i++) S.sparks.push({ x: e.x, y: e.y, vx: rnd(-40, 40), vy: rnd(-40, 20), life: 0.3, col: LV[e.lv].col });
+}
+function ripe(e) { return e.state === 'in' && e.age >= T(e.lv); }
+function fumble(lv, target) {
+  const now = performance.now(), b = BOX[lv];
+  const victim = target || S.eddies.filter(e => e.lv === lv && e.state === 'in').sort((a, b) => a.age - b.age)[0];
+  if (victim) {
+    victim.state = 'gone'; S.waste += LV[lv].units;
+    for (let i = 0; i < 10; i++) S.sparks.push({ x: victim.x, y: victim.y, vx: rnd(-60, 60), vy: rnd(-60, 30), life: 0.4, col: '#F83800' });
+  }
+  S.score = Math.max(0, S.score - 15); S.jam[lv] = now + 900;
+  S.pops.push({ txt: 'TOO SOON! WASTED', x: b.x + b.w / 2, y: b.y - 8, until: now + 800, col: '#F83800' });
+  tone(70, 0.25, 0.1, 'sawtooth');
+}
+function playerBreak(lv) {
+  if (!S.running) return;
+  if (lv === 1 && S.stage < 2) { S.pops.push({ txt: 'NOT YET', x: BOX[1].x + 60, y: BOX[1].y - 8, until: performance.now() + 600, col: '#FCFCFC' }); return; }
+  if (performance.now() < S.jam[lv]) return;                                 // key jammed after a fumble
+  const c = S.eddies.filter(e => e.lv === lv && ripe(e)).sort((a, b) => b.age - a.age)[0];
+  if (c) breakEddy(c, true); else fumble(lv);
+}
+document.getElementById('kA').onclick = () => playerBreak(0);
+document.getElementById('kS').onclick = () => playerBreak(1);
+addEventListener('keydown', e => { if (!dlg.hidden) return; const k = e.key.toUpperCase(); if (k === 'A') playerBreak(0); if (k === 'S') playerBreak(1); });
+const cv = document.getElementById('cv'), g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+cv.addEventListener('pointerdown', ev => {
+  if (!S || !S.running) return;
+  const r = cv.getBoundingClientRect(), x = (ev.clientX - r.left) * 384 / r.width, y = (ev.clientY - r.top) * 216 / r.height;
+  const hit = S.eddies.filter(e => e.state === 'in' && e.lv < 2 && Math.hypot(e.x - x, e.y - y) < LV[e.lv].r + 5).sort((a, b) => b.age - a.age)[0];
+  if (!hit) return;
+  if (hit.lv === 1 && S.stage < 2) { S.pops.push({ txt: 'NOT YET', x: hit.x, y: hit.y - 10, until: performance.now() + 600, col: '#FCFCFC' }); return; }
+  if (performance.now() < S.jam[hit.lv]) return;
+  if (ripe(hit)) breakEddy(hit, true); else fumble(hit.lv, hit);
+});
+
+/* ===== update ===== */
+function update(dt) {
+  if (!S.running) return;
+  S.t += dt;
+  S.stage = 2;
+  const nowJ = performance.now();
+  document.getElementById('kA').disabled = nowJ < S.jam[0];
+  document.getElementById('kS').disabled = S.stage < 2 || nowJ < S.jam[1];
+  if (!S.gusted) S.banner = S.t < 10 * slow ? 'WARMING UP: CLICK GLOWING EDDIES (OR A / S)' : 'CLICK GLOWING EDDIES (OR PRESS A / S)';
+  S.dropClock += dt;
+  if (S.dropClock >= dropEvery()) { S.dropClock = 0; spawn(0, 70, 30); S.flow[0] += LV[0].units; tone(110, 0.1, 0.05, 'triangle'); }
+  for (const e of S.eddies) {
+    e.spin += dt * 6 / LV[e.lv].r * (e.lv === 0 ? 1 : 1.6);
+    if (e.state === 'fall') {
+      e.ft += dt / 0.55; const q = Math.min(1, e.ft);
+      e.x = e.x0 + (e.tx - e.x0) * q; e.y = e.y0 + (e.ty - e.y0) * q - 18 * Math.sin(Math.PI * q) * (e.lv === 0 ? 0.3 : 1);
+      if (q >= 1) { e.state = 'in'; e.target = undefined; }
+    } else if (e.state === 'in') {
+      e.age += dt; e.st = (e.st || 0) + dt * GAMMA * 0.5 / (TBIG * slow); const b = BOX[e.lv], r = LV[e.lv].r;
+      e.x += e.vx * dt; e.y += e.vy * dt;
+      if (e.x < b.x + r + 2 || e.x > b.x + b.w - r - 2) e.vx *= -1;
+      if (e.y < b.y + r + 4 || e.y > b.y + b.h - r - 2) e.vy *= -1;
+      e.x = Math.max(b.x + r + 2, Math.min(b.x + b.w - r - 2, e.x)); e.y = Math.max(b.y + r + 4, Math.min(b.y + b.h - r - 2, e.y));
+      if (e.lv === 2 && ripe(e)) {      // the cascade continues below 20 m on its own, ever faster, until viscosity turns it into heat at ~1 mm
+        e.state = 'gone'; S.flow[3] += LV[2].units;
+        S.sparks.push({ x: e.x, y: e.y, tx: VENT.x, ty: VENT.y, ft: 0, heat: true, life: 0.6, col: '#F83800' });
+      }
+    } else if (e.state === 'spill') {
+      e.vy += 120 * dt; e.x += e.vx * dt; e.y += e.vy * dt; if (e.y > 230) e.state = 'gone';
+    }
+  }
+  S.eddies = S.eddies.filter(e => e.state !== 'gone');
+  for (const s of S.sparks) { s.life -= dt; if (s.heat) { s.ft += dt / 0.6; s.x += (s.tx - s.x) * Math.min(1, dt * 5); s.y += (s.ty - s.y) * Math.min(1, dt * 5); } else { s.x += s.vx * dt; s.y += s.vy * dt; } }
+  S.sparks = S.sparks.filter(s => s.life > 0);
+  // averages after warm-up
+  if (S.t > 8 * slow) { S.heldT += dt; for (let lv = 0; lv < 3; lv++) {
+    const inside = S.eddies.filter(e => e.lv === lv && e.state === 'in');
+    S.held[lv] += dt * LV[lv].units * inside.length;
+    for (const e of inside) { S.stretch[lv] += dt * (1 + (e.st || 0)); S.stretchW[lv] += dt; } } }
+  const a = Math.min(1, dt / 3); S.inRate += a * ((S._lastIn !== S.flow[0] ? (S.flow[0] - (S._lastIn || 0)) / dt : 0) - S.inRate); S._lastIn = S.flow[0];
+  S.outRate += a * ((S._lastOut !== S.flow[3] ? (S.flow[3] - (S._lastOut || 0)) / dt : 0) - S.outRate); S._lastOut = S.flow[3];
+}
+
+/* ===== drawing ===== */
+const rect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
+const text = (s, x, y, c = '#FCFCFC', align = 'left') => { g.fillStyle = c; g.font = '8px "Press Start 2P", monospace'; g.textAlign = align; g.textBaseline = 'top'; g.fillText(s, Math.round(x), Math.round(y)); };
+function circle(x, y, r, c, fill) { g.beginPath(); g.arc(Math.round(x), Math.round(y), r, 0, 2 * Math.PI); if (fill) { g.fillStyle = c; g.fill(); } else { g.strokeStyle = c; g.lineWidth = 1; g.stroke(); } }
+function eddy(e, now) {
+  const L = LV[e.lv], r = L.r, rp = ripe(e), glow = rp && Math.floor(now / 160) % 2 === 0;
+  const asp = Math.min(5, 1 + (e.st || 0)), over = asp > 3.5;
+  const col = over ? '#F83800' : rp ? '#F8B800' : L.col;
+  g.save(); g.translate(e.x, e.y); g.rotate(-0.45); g.scale(Math.sqrt(asp), 1 / Math.sqrt(asp));   // shear: stretched and tilted
+  if (rp) { g.beginPath(); g.arc(0, 0, r + 2, 0, 2 * Math.PI); g.fillStyle = glow ? 'rgba(248,184,0,0.5)' : 'rgba(248,184,0,0.25)'; g.fill(); }
+  g.lineWidth = 1 / Math.sqrt(asp); g.strokeStyle = col;
+  g.beginPath(); g.arc(0, 0, r, 0, 2 * Math.PI); g.stroke();
+  for (let k = 0; k < 2; k++) { g.beginPath();
+    for (let s = 0; s <= 1.0001; s += 0.1) { const a = e.spin + k * Math.PI + s * 3.2, rr = r * s; s ? g.lineTo(rr * Math.cos(a), rr * Math.sin(a)) : g.moveTo(rr * Math.cos(a), rr * Math.sin(a)); }
+    g.stroke(); }
+  g.restore();
+  if (e.state === 'in' && !rp && e.lv < 2) {
+    g.beginPath(); g.strokeStyle = '#F8B800'; g.lineWidth = 1.5; g.arc(e.x, e.y, r + 2.5, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * e.age / T(e.lv)); g.stroke();
+  }
+}
+function glassBox(b, lv, auto) {
+  rect(b.x, b.y, b.w, b.h, 'rgba(60,188,252,0.07)');
+  g.strokeStyle = auto ? '#3C3C3C' : '#BCBCBC'; g.lineWidth = 2; g.beginPath();
+  g.moveTo(b.x, b.y); g.lineTo(b.x, b.y + b.h); g.lineTo(b.x + b.w, b.y + b.h); g.lineTo(b.x + b.w, b.y); g.stroke();
+  rect(b.x + 3, b.y + 6, 2, b.h - 12, 'rgba(252,252,252,0.25)');      // glass highlight
+  const n = S.eddies.filter(e => e.lv === lv && e.state === 'in').length, full = n / b.cap;
+  rect(b.x + b.w - 6, b.y + b.h - 3 - (b.h - 8) * Math.min(1, full), 3, (b.h - 8) * Math.min(1, full), full > 0.8 ? '#F83800' : '#58D854');
+  text(`${LV[lv].name} ${LV[lv].L} m`, b.x + 8, b.y + 3, auto ? '#3C3C3C' : '#BCBCBC');
+  if (auto) text('AUTO', b.x + b.w - 42, b.y + 3, '#7C7C7C');
+}
+function draw(now) {
+  // background: dusk sky, ground
+  for (let y = 0; y < 216; y += 4) rect(0, y, 384, 4, `rgb(${10 + y / 8 | 0},${8 + y / 10 | 0},${40 + y / 4 | 0})`);
+  if (!S) return requestAnimationFrame(draw);
+  // ship
+  const sx = 70, sy = 18 + Math.round(Math.sin(now / 600) * 1.5);
+  g.fillStyle = '#3CBCFC'; g.beginPath(); g.ellipse(sx, sy - 3, 9, 6, 0, Math.PI, 0); g.fill();
+  g.fillStyle = '#BCBCBC'; g.beginPath(); g.ellipse(sx, sy + 1, 26, 5, 0, 0, 2 * Math.PI); g.fill();
+  for (let i = 0; i < 5; i++) rect(sx - 18 + i * 9, sy, 3, 2, (Math.floor(now / 250) + i) % 5 ? '#AC7C00' : '#F8B800');
+  text('ENERGY IN', sx + 32, sy - 4, '#3CBCFC');
+  // pipes between containers
+  g.strokeStyle = '#3C3C3C'; g.lineWidth = 4;
+  g.beginPath(); g.moveTo(BOX[0].x + BOX[0].w, BOX[0].y + BOX[0].h - 8); g.lineTo(BOX[1].x + 30, BOX[0].y + BOX[0].h - 8); g.lineTo(BOX[1].x + 30, BOX[1].y); g.stroke();
+  g.beginPath(); g.moveTo(BOX[1].x + BOX[1].w, BOX[1].y + BOX[1].h - 8); g.lineTo(BOX[2].x + 26, BOX[1].y + BOX[1].h - 8); g.lineTo(BOX[2].x + 26, BOX[2].y); g.stroke();
+  g.beginPath(); g.moveTo(BOX[2].x + BOX[2].w, BOX[2].y + 10); g.lineTo(VENT.x, VENT.y); g.stroke();
+  // heat vent
+  const hv = 0.4 + 0.3 * Math.sin(now / 120);
+  circle(VENT.x + 6, VENT.y, 8, `rgba(248,56,0,${hv})`, true); text('HEAT ~1 mm', 382, 198, '#F83800', 'right');
+  glassBox(BOX[0], 0, false); glassBox(BOX[1], 1, S.stage < 2); glassBox(BOX[2], 2, false);
+  text('goes on', BOX[2].x + 8, BOX[2].y + BOX[2].h - 10, '#7C7C7C');
+  // the rest of the cascade, too fast to follow: 20 m -> 5 m -> 1 m -> ... -> 1 mm, where viscosity makes heat
+  const steps = [[5, 3.0], [1, 2.2], [0.1, 1.5], [0.001, 1]];
+  steps.forEach(([L, r], i) => { const x = BOX[2].x + BOX[2].w + 6 + i * 6, y = BOX[2].y + 14 + i * 7;
+    const ph = (now / 200 + i) % 4 < 2; circle(x, y, r, ph ? '#BCBCBC' : '#7C7C7C', false); });
+  for (const e of S.eddies) eddy(e, now);
+  for (const s of S.sparks) rect(s.x, s.y, 2, 2, s.col);
+  // HUD
+  text('THE CASCADE', 4, 4, '#F8B800'); text(`SCORE ${S.score}`, 380, 4, '#FCFCFC', 'right');
+  if (GAMMA) text('SHEAR ON (GAMMA 3.9)', 250, 42, '#F878F8');
+  text(S.banner, 192, 205, '#F8B800', 'center');
+  // flow meters: in = out in steady state
+  const m = (v, x, lab, col) => { rect(x, 30, 40, 5, '#202020'); rect(x, 30, Math.min(40, 40 * v / 10), 5, col); text(lab, x, 20, col); };
+  m(S.inRate, 250, 'IN', '#3CBCFC'); m(S.outRate, 300, 'HEAT OUT', '#F83800');
+  S.pops = S.pops.filter(p => p.until > now); for (const p of S.pops) text(p.txt, p.x, p.y, p.col, 'center');
+  if (S.result) {
+    rect(40, 14, 304, 92, 'rgba(0,0,0,0.92)'); text('ENERGY HELD BY EACH SIZE', 192, 18, '#FCFCFC', 'center');
+    const mx = Math.max(...S.result.held, 1e-9);
+    S.result.held.forEach((v, i) => { const h = 58 * v / mx, th = 58 * Math.pow(LV[i].L / LV[0].L, 2 / 3);
+      rect(90 + i * 80, 92 - h, 44, h, LV[i].col); rect(86 + i * 80, 92 - th, 52, 2, '#FCFCFC');
+      text(`${LV[i].L} m`, 112 + i * 80, 95, '#BCBCBC', 'center'); });
+    text('line: L^(2/3)', 336, 30, '#FCFCFC', 'right');
+  }
+  requestAnimationFrame(draw);
+}
+
+/* ===== dialog ===== */
+const dlg = document.getElementById('dlg'), dtxt = document.getElementById('dtxt'), dopts = document.getElementById('dopts');
+function say(s, opts = ['OK']) { return new Promise(res => { dlg.hidden = false; dtxt.textContent = s;
+  dopts.innerHTML = opts.map((o, k) => `<button class="nes" data-k="${k}">${o}</button>`).join('');
+  dopts.querySelectorAll('button').forEach(b => b.onclick = () => { dlg.hidden = true; res(+b.dataset.k); });
+  dopts.querySelector('button').focus({ preventScroll: true }); }); }
+
+/* ===== the run ===== */
+let lastFrame = performance.now();
+setInterval(() => { const now = performance.now(), dt = Math.min(0.05, (now - lastFrame) / 1000); lastFrame = now; if (S) update(dt); }, 20);
+async function run() {
+  newGame();
+  await say('THE CASCADE\n\nThe ship pumps energy into the air as BIG eddies. Energy can only leave as heat, and only at the very smallest scale, about 1 mm, where viscosity acts.\n\nAn eddy can break once its timer ring is full: then it glows. Click it (or press A / S) and it splits into three smaller eddies, which fall into the next container. You handle the BIG and MEDIUM eddies. From 20 m down the cascade carries on by itself, 20 m to 5 m to 1 m and on to about 1 mm, too fast to follow, and ends as heat.\n\nKeep the energy flowing. Breaking an eddy before it glows wastes its energy and jams that key for a moment. If a container is full, new eddies spill over and their energy is lost.', ['Start']);
+  S.running = true;
+  await new Promise(res => { const iv = setInterval(async () => {
+    if (!S.gusted && S.t > 30 * slow) {
+      S.running = false; S.gusted = true;
+      const k = await say('GUST! The ship doubles the energy it pumps in.\n\nWill each size have to pass its energy on faster or slower?', ['Faster', 'Slower', 'Same']);
+      await say(`${k === 0 ? 'Right.' : 'Faster.'} More energy per second has to flow through every size, and the eddies turn over faster too.`, ['Keep going']);
+      S.eps = 2; S.banner = 'GUST: MORE ENERGY IN, EVERYTHING FASTER'; lastFrame = performance.now(); S.running = true;
+    }
+    if (S.t > 50 * slow) { clearInterval(iv); res(); }
+  }, 50); });
+  S.running = false;
+  const held = S.held.map(h => h / Math.max(S.heldT, 1e-9));
+  S.result = { held };
+  const f = S.flow;
+  const eff = Math.round(100 * f[3] / Math.max(1, f[0]));
+  const st = S.stretch.map((v, i) => (v / Math.max(S.stretchW[i], 1e-9)).toFixed(1));
+  const mann = GAMMA ? `\n\nSHEAR ON (Mann Gamma 3.9): average stretch BIG ${st[0]}, MEDIUM ${st[1]}, SMALL ${st[2]}. Long-lived big eddies are stretched by the shear (anisotropic); short-lived small ones stay nearly round (isotropic). In Mann's model the eddy lifetime stops the stretching: without it the field would never become stationary. A larger Gamma means eddies live longer under shear: a more anisotropic flow.`
+                     : `\n\nTry again with Shear (Mann) on.`;
+  await say(`DONE. Score ${S.score}. Efficiency ${eff} % of the energy reached heat (wasted ${S.waste} units, spilled ${S.spill}; the rest is still in the containers).\n\nEnergy that passed each step: into BIG ${f[0]}, BIG to MEDIUM ${f[1]}, MEDIUM to SMALL ${f[2]}, into HEAT ${f[3]}.\n\nEach container held (flow) x (time its eddies need to ripen). Smaller eddies ripen faster, so they hold less energy: the bars follow L^(2/3), the -5/3 spectrum per band.${mann}`, ['Play again']);
+  S.result = null; run();
+}
+(document.fonts ? document.fonts.load('8px "Press Start 2P"').catch(() => {}) : Promise.resolve()).finally(() => { newGame(); requestAnimationFrame(draw); run(); });
+</script>
+</body>
+</html>

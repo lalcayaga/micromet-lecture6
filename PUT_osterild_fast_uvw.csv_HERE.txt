@@ -1,0 +1,1 @@
+Put osterild_fast_uvw.csv (from Lecture 5) here, next to the notebooks.

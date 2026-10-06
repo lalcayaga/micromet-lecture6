@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Eddy Contact v9 - 46100 Lecture 6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#000000; --ink:#FCFCFC; --dim:#7C7C7C; --line:#3C3C3C;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){ --bg:#000000; --ink:#FCFCFC; } }
+:root[data-theme="light"],:root[data-theme="dark"]{ --bg:#000000; --ink:#FCFCFC; }
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Press Start 2P","Courier New",monospace;font-size:11px;line-height:1.7}
+.wrap{max-width:960px;margin:0 auto;padding:8px 10px 20px}
+.screen{position:relative;width:100%;aspect-ratio:16/9;background:#000;border:4px solid #FCFCFC;box-shadow:0 0 0 4px #000,0 0 0 8px #7C7C7C}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+.dialog{position:absolute;left:3%;right:3%;bottom:4%;background:#000;border:4px double #FCFCFC;padding:10px 12px;font-size:clamp(8px,1.6vw,13px);line-height:1.8;min-height:30%}
+.dialog[hidden]{display:none}
+.dialog .txt{white-space:pre-wrap}
+.dialog .opts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.nes{font:inherit;font-size:clamp(8px,1.4vw,12px);background:#000;color:#FCFCFC;border:3px solid #FCFCFC;padding:6px 10px;cursor:pointer}
+.nes:hover,.nes:focus-visible{background:#FCFCFC;color:#000;outline:none}
+.nes::before{content:"> ";visibility:hidden}
+.nes:hover::before,.nes:focus-visible::before{visibility:visible}
+.console{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-top:14px}
+.col{display:flex;flex-direction:column;gap:6px;min-width:0}
+.eqbox{position:relative;height:120px;border:3px solid #FCFCFC;background:#101010;display:none;align-items:stretch;justify-content:center}
+body.eqmode .eqbox{display:flex}
+body.faderhint .eqbox::after{content:"DRAG";position:absolute;top:38%;left:0;right:0;text-align:center;font-size:clamp(7px,1.1vw,10px);color:#F8B800;pointer-events:none;animation:blink .8s steps(2) infinite}
+body.faderhint .eqbox{border-color:#F8B800}
+@keyframes blink{50%{opacity:0}}
+.eqbox .ghost{position:absolute;left:3px;right:3px;bottom:0;height:0;background:repeating-linear-gradient(0deg,#3C3C3C 0 4px,#202020 4px 8px);border-top:3px dashed #58D854}
+.eqbox .fill{position:absolute;left:30%;right:30%;bottom:0;height:0;pointer-events:none}
+.eqbox input{position:relative;writing-mode:vertical-lr;direction:rtl;width:100%;height:100%;margin:0;opacity:0;cursor:ns-resize;touch-action:none}
+.eqbox .cap{position:absolute;left:8%;right:8%;height:8px;background:#FCFCFC;pointer-events:none;transform:translateY(50%)}
+body.eqmode .key .meter{display:none}
+#scans{font-size:clamp(8px,1.3vw,11px);color:#58D854;display:none}
+body.eqmode #scans{display:inline}
+@media (max-width:560px){ .eqbox{height:96px} }
+.key{position:relative;font:inherit;font-size:clamp(7px,1.2vw,10px);color:#000;border:3px solid #000;box-shadow:0 0 0 3px #FCFCFC;padding:56px 2px 6px;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;overflow:hidden}
+.key .meter{position:absolute;left:18%;right:18%;bottom:46px;height:0;background:#000;transition:height .25s steps(6)}
+.key .lbl{position:relative;display:block}
+.key .pips{position:absolute;top:6px;left:0;right:0;display:flex;justify-content:center;gap:3px;height:10px}
+.key .pips i{display:block;width:9px;height:9px;background:#000}
+.key .kb{display:block;opacity:.6;margin-top:2px}
+.key.sel{box-shadow:0 0 0 3px #FCFCFC,0 0 0 7px #F8B800}
+.key.down{filter:brightness(1.5)}
+.key:focus-visible{outline:3px dashed #FCFCFC;outline-offset:4px}
+.name{font:inherit;font-size:clamp(10px,2vw,16px);background:#000;color:#F8B800;border:3px solid #FCFCFC;padding:6px 8px;width:14ch;text-transform:uppercase;margin-top:6px}
+.name:focus{outline:3px dashed #F8B800;outline-offset:3px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.bar .nes{font-size:clamp(8px,1.3vw,11px)}
+.hint{color:#BCBCBC;font-size:clamp(7px,1.1vw,9px);margin-top:10px;line-height:1.9}
+@media (max-width:560px){ .key{padding-top:40px} .key .meter{bottom:38px} }
+@media (prefers-reduced-motion: reduce){ .key .meter{transition:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="screen">
+    <canvas id="cv" width="256" height="144" aria-label="A pixel-art ship blows eddies that drift with the wind past a met mast with a sonic anemometer"></canvas>
+    <div class="dialog" id="dlg" hidden><div class="txt" id="dtxt"></div><div class="opts" id="dopts"></div></div>
+  </div>
+  <div class="console" id="console"></div>
+  <div class="bar">
+    <button class="nes" id="replay" disabled>Replay (R)</button>
+    <button class="nes" id="send" disabled>Transmit (Enter)</button>
+    <button class="nes" id="mute">Sound: on</button>
+    <span id="scans"></span>
+  </div>
+  <p class="hint">Keys A S D F G H J K. Each key is one eddy size. In level 2, each size has a fader: drag it up and down to set the strength, like an equalizer. Hold a key to let the analyser listen. You see the eddies 20x faster than real life and hear the sonic 10 000x faster. Earphones help in a full room; the screen carries the game without sound.</p>
+</div>
+
+<script>
+/* ============ LEADERBOARD SETTINGS (edit these two lines) ============
+   API_URL: the Google Apps Script web-app address (ends in /exec). Leave '' to keep
+   scores on this device only. SESSION: a label that keeps each class run separate;
+   can also be set in the link: eddy_contact.html?session=L6-2026                    */
+const API_URL = '';
+const SESSION = new URLSearchParams(location.search).get('session') || 'L6-2026';
+
+/* ======================= physics & tuning =======================
+   The ship blows rows of eddies of size ℓ and strength A. The wind U carries them past
+   the mast; the sonic feels u′(t), which swings at f = U/ℓ with amplitude A (Taylor).
+   At 8 m/s the eight sizes give a two-octave pentatonic scale: doubling U = one octave. */
+const RATIOS = [1, 9/8, 5/4, 3/2, 5/3, 2, 9/4, 5/2];
+const SIZES = RATIOS.map(r => 320 / r);                   // 320, 284, 256, 213, 192, 160, 142, 128 m
+const NAMES = SIZES.map(s => Math.round(s) + 'm');
+const COLORS = ['#F83800', '#FCA044', '#F8B800', '#58D854', '#00E8D8', '#3CBCFC', '#6844FC', '#F878F8'];
+const KEYS = 'ASDFGHJK';
+const LEVEL_NAMES = ['off', 'weak', 'medium', 'strong'];
+const K_AUDIO = 10480, TC_VIS = 20, PXM = 0.075;
+const SHIP_X = 46, MAST_X = 196, BAND_Y = 74;
+const T_SCAN = 960, N_SCAN = 1920;
+
+/* ======================= sound ======================= */
+let actx = null, muted = false;
+function ac() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} return actx; }
+function tone(f, dur = 0.35, vol = 0.12, type = 'square', delay = 0) {
+  if (muted || !ac() || vol <= 0) return;
+  const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.01);
+  g.gain.setValueAtTime(vol, t + dur * 0.7); g.gain.linearRampToValueAtTime(0, t + dur);
+  o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+const jingle = (notes, step = 0.09) => notes.forEach((f, i) => tone(f, step * 0.9, 0.08, 'square', i * step));
+const sfxGood = () => jingle([523, 659, 784, 1047]);
+const sfxBad = () => { tone(110, 0.25, 0.12, 'sawtooth'); tone(98, 0.3, 0.12, 'sawtooth', 0.2); };
+const thunder = () => { tone(55, 0.6, 0.15, 'sawtooth'); tone(41, 0.8, 0.12, 'sawtooth', 0.1); };
+document.getElementById('mute').onclick = e => { muted = !muted; e.target.textContent = 'Sound: ' + (muted ? 'off' : 'on'); };
+
+/* ======================= world state ======================= */
+const W = { title: true, hud: '', lives: 3, score: 0, U: 8, s: 0, rows: [], ghost: [], night: false,
+  flashUntil: 0, shake: 0, beam: 0, trace: [], cascade: null, spectrum: null, shipHidden: false, shipDY: 0, planet: false };
+const P = { name: '', level: 0, stormTrap: null, finaleGuess: '', introSeen: false, faderHintDone: false };   // what we save for the class
+const sonicValue = () => [...W.rows, ...W.ghost].reduce((u, r) => u + r.A * Math.sin(2 * Math.PI * W.s / r.ell + r.ph), 0);
+
+/* ======================= drawing ======================= */
+const cv = document.getElementById('cv'), g = cv.getContext('2d');
+g.imageSmoothingEnabled = false;
+const rect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x | 0, y | 0, w | 0, h | 0); };
+const text = (s, x, y, c = '#FCFCFC', align = 'left') => { s = toAscii(s); g.fillStyle = c; g.font = '8px "Press Start 2P", monospace'; g.textAlign = align; g.textBaseline = 'top'; g.fillText(s, x | 0, y | 0); };
+function sprite(rows, pal, x, y) { rows.forEach((r, j) => [...r].forEach((ch, i) => { if (pal[ch]) rect(x + i, y + j, 1, 1, pal[ch]); })); }
+function ring(cx, cy, r, col, spin) {
+  for (let a = 0; a < 2 * Math.PI; a += 1 / Math.max(r, 2)) rect(Math.round(cx + r * Math.cos(a)), Math.round(cy + r * Math.sin(a)), 1, 1, col);
+  rect(Math.round(cx + r * Math.cos(spin)) - 1, Math.round(cy + r * Math.sin(spin)) - 1, 2, 2, col);
+}
+// stronger eddies look brighter; spin keeps the physics: rim speed ∝ A, so angular speed ∝ A / r
+const shade = A => A > 0.85 ? '#FCFCFC' : A > 0.5 ? '#BCBCBC' : '#7C7C7C';
+const HEART = ['.r.r.', 'rrrrr', 'rrrrr', '.rrr.', '..r..'];
+const SCIENTIST = ['..hhhh..', '.hhhhhh.', '.hssssh.', '..ssss..', '..wwww..', '.wwwwww.', 'wwwwwwww', 's.wwww.s', '..wwww..', '..bbbb..', '..b..b..', '.kk..kk.'];
+const SCI_PAL = { h: '#503000', s: '#F8B8A0', w: '#FCFCFC', b: '#0058F8', k: '#000000' };
+const stars = Array.from({ length: 70 }, () => ({ x: Math.random() * 256, y: Math.random() * 60, p: Math.random() * 6 }));
+let last = performance.now(), sampleClock = 0;
+
+function draw(now) {
+  if (W.cascadeMode) { last = now; requestAnimationFrame(draw); return; }
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; const t = now / 1000;
+  W.s += W.U * TC_VIS * dt;
+  sampleClock += dt; if (sampleClock > 0.03) { sampleClock = 0; W.trace.push(W.rows.length + W.ghost.length ? sonicValue() : 0); if (W.trace.length > 100) W.trace.shift(); }
+  const lightning = W.flashUntil > now, dark = W.night && !lightning;
+  if (dark) { rect(0, 0, 256, 104, '#000010'); for (const s of stars) if (Math.sin(t * 2 + s.p) > 0) rect(s.x, s.y, 1, 1, '#7C7C7C'); }
+  else if (lightning) rect(0, 0, 256, 104, '#BCBCFC');
+  else { rect(0, 0, 256, 40, '#3CBCFC'); rect(0, 40, 256, 34, '#6888FC'); rect(0, 74, 256, 30, '#A4C8FC'); }
+  for (let x = 0; x < 256; x += 4) { const h = 5 + 3 * Math.sin(x / 23) + 2 * Math.sin(x / 9); rect(x, 104 - h, 4, h, dark ? '#10081C' : '#4C9C2C'); }
+  rect(0, 104, 256, 40, dark ? '#140C04' : '#503000');
+  if (!dark) for (let i = 0; i < 6; i++) { const x = ((W.s * PXM + i * 47) % 300) - 30, y = 12 + i * 15; rect(x, y, 10, 1, 'rgba(252,252,252,0.6)'); }
+  if (!dark) for (const r of W.rows) {
+    const sp = r.ell * PXM, rad = Math.max(3, 0.45 * sp), off = ((W.s * PXM + r.ph / (2 * Math.PI) * sp) % sp + sp) % sp;
+    for (let x = SHIP_X + 12 + off - sp; x < 270; x += sp) if (x > SHIP_X + 10)
+      ring(x, BAND_Y, rad, lightning ? '#000000' : shade(r.A), t * 40 * r.A / rad + x);
+  }
+  if (W.cascade) W.cascade(now);
+  const mc = dark ? '#3C3C3C' : '#BCBCBC';
+  rect(MAST_X, 34, 2, 70, mc); for (let y = 40; y < 104; y += 8) rect(MAST_X - 2, y, 6, 1, dark ? '#202020' : '#7C7C7C');
+  rect(MAST_X - 3, 32, 8, 2, mc); const cupA = W.s * 0.05; rect(MAST_X + 1 + Math.round(4 * Math.cos(cupA)), 30, 2, 2, mc); rect(MAST_X + 1 - Math.round(4 * Math.cos(cupA)), 30, 2, 2, mc);
+  rect(MAST_X - 10, BAND_Y - 1, 12, 2, '#F8B800'); rect(MAST_X - 12, BAND_Y - 3, 2, 6, '#F8B800');
+  if (W.planet) {                                    // the Whorls' home: a banded gas giant with a great storm
+    const px = 140, py = 24, pr = 13, bands = ['#F8B800', '#FCA044', '#AC7C00', '#FCA044', '#F8D878', '#AC7C00', '#FCA044'];
+    for (let dy = -pr; dy <= pr; dy++) { const w = Math.round(Math.sqrt(pr * pr - dy * dy)); rect(px - w, py + dy, 2 * w, 1, bands[Math.floor((dy + pr) / 4) % bands.length]); }
+    rect(px + 2, py + 3, 6, 3, '#F83800'); rect(px + 3, py + 2, 4, 1, '#F83800');
+  }
+  const bob = Math.round(Math.sin(t * 1.6)), sx = SHIP_X + (W.shake ? Math.round(Math.sin(t * 60) * 2) : 0), sy = 52 + bob + W.shipDY;
+  if (!W.shipHidden) {
+  for (let dy = -6; dy <= -1; dy++) { const w = Math.round(9 * Math.sqrt(1 - ((dy + 1) / 6) ** 2)); rect(sx - w, sy + dy, 2 * w, 1, dark ? '#14445C' : '#3CBCFC'); }
+  for (let dy = 0; dy <= 6; dy++) { const w = Math.round(30 * Math.sqrt(1 - (Math.abs(dy - 2) / 5) ** 2)); rect(sx - w, sy + dy, 2 * w, 1, dark ? (dy > 3 ? '#202020' : '#3C3C3C') : (dy > 3 ? '#7C7C7C' : '#BCBCBC')); }
+  for (let i = 0; i < 5; i++) rect(sx - 20 + i * 10, sy + 2, 3, 2, (Math.floor(t * 4) + i) % 5 === 0 ? '#F8B800' : (dark ? '#5C4400' : '#AC7C00'));
+  if (W.rows.length) rect(sx + 30, sy + 1, 4, 5, '#7C7C7C');
+  if (W.beam > now) { g.fillStyle = 'rgba(248,216,120,0.35)'; g.beginPath(); g.moveTo(sx - 8, sy + 6); g.lineTo(sx + 8, sy + 6); g.lineTo(sx + 22, 104); g.lineTo(sx - 22, 104); g.fill(); }
+  }
+  sprite(SCIENTIST, SCI_PAL, 16, 112); rect(6, 124, 28, 6, '#7C7C7C'); rect(7, 125, 26, 1, '#BCBCBC');
+  rect(140, 108, 108, 32, '#000'); rect(140, 108, 108, 1, '#58D854'); rect(140, 139, 108, 1, '#58D854'); rect(140, 108, 1, 32, '#58D854'); rect(247, 108, 1, 32, '#58D854');
+  text('SONIC', 143, 110, '#1C7C1C');
+  const amp = W.ghost.length ? Math.max(1, W.ghost.reduce((s, r) => s + r.A, 0) * 0.45) : 2.2; let prev = null;
+  W.trace.forEach((u, k) => { const y = 126 - Math.round(12 * u / amp), y0 = prev ?? y; rect(146 + k, Math.max(111, Math.min(y, y0)), 1, Math.min(Math.abs(y - y0) + 1, 28), '#58D854'); prev = y; });
+  for (let x = 40; x < 140; x += 3) rect(x, 131, 1, 1, '#58D854'); for (let y = BAND_Y + 3; y < 131; y += 3) rect(MAST_X - 12, y, 1, 1, dark ? '#1C501C' : '#58D854');
+  if (W.cascadeGame) {
+    const C = W.cascadeGame;
+    rect(0, 11, 256, 93, '#000010');
+    text(C.banner, 128, 12, '#F8B800', 'center');
+    text('ENERGY IN', 46, 21, '#3CBCFC');
+    for (let r = 0; r < 5; r++) {
+      const y = C.rowY(r), fill = Math.min(1, C.E[r] / C.cap(r)), n = Math.round(fill * C.nSlots(r));
+      const auto = r < 4 && r >= C.player, ripe = r < 4 && !auto && C.ripeDist(r) <= Math.min(0.2, 0.4 * C.T(r));
+      const A = Math.pow(CROWS[r] / 320, 1 / 3), c = Math.round(110 + 140 * A);
+      const col = ripe ? '#F8B800' : auto ? '#3C3C3C' : `rgb(${c},${c},${c})`;
+      if (fill > 0.8 && !auto) rect(66, y - 7, 154, 14, Math.floor(now / 150) % 2 ? '#5C0000' : '#2C0000');
+      text(`${CROWS[r]}m`, 4, y - 3, auto ? '#3C3C3C' : '#BCBCBC');
+      for (let i = 0; i < n; i++) ring(C.slotX(r, i), y, CRAD[r], col, C.t * 8 * A / CRAD[r] + i);
+      if (C.flash[r] > now) rect(66, y - 7, 154, 14, 'rgba(248,184,0,0.25)');
+      if (r < 4) {
+        if (auto) text('AUTO', 226, y - 3, '#3C3C3C');
+        else { text(KEYS[r], 228, y - 3, ripe ? '#F8B800' : '#7C7C7C'); if (ripe) text('<', 238, y - 3, '#F8B800'); }
+      } else text('HEAT', 224, y - 3, '#F83800');
+    }
+    C.parts = C.parts.filter(p => now < p.t0 + p.dur);
+    for (const p of C.parts) { const q = (now - p.t0) / p.dur; if (q < 0) continue;
+      rect(p.x0 + (p.x1 - p.x0) * q, p.y0 + (p.y1 - p.y0) * q, 2, 2, p.col); }
+    if (C.pop && C.pop.until > now) text(C.pop.txt, 150, C.rowY(C.pop.r) - 3, C.pop.txt === 'OVERFLOW!' ? '#F83800' : '#FCFCFC', 'center');
+  }
+  if (W.spectrum) { rect(20, 4, 216, 50, 'rgba(0,0,0,0.88)'); text('ENERGY HELD BY EACH SIZE', 128, 6, '#FCFCFC', 'center');
+    W.spectrum.forEach((v, i) => { rect(40 + i * 38, 50 - v, 26, v, COLORS[i]); text(`${CROWS[i]}`, 53 + i * 38, 52 - v - 9, '#BCBCBC', 'center'); });
+    const th = CROWS.map((_, r) => Math.max(1, Math.round(36 * Math.pow(CROWS[r] / 320, 2 / 3))));
+    th.forEach((v, i) => rect(38 + i * 38, 50 - v, 30, 1, '#FCFCFC'));
+    text('line: L^(2/3)', 232, 16, '#FCFCFC', 'right'); }
+  if (W.title) {
+    rect(0, 0, 256, 144, 'rgba(0,0,0,0.6)');
+    text('EDDY CONTACT', 128, 28, '#F8B800', 'center'); text('a 46100 micrometeorology game', 128, 44, '#BCBCBC', 'center');
+    if (Math.floor(t * 2) % 2) text('PRESS START', 128, 70, '#FCFCFC', 'center');
+  } else if (!W.spectrum) {
+    text(W.hud, 4, 4, dark ? '#BCBCBC' : '#000'); for (let i = 0; i < Math.max(0, W.lives); i++) sprite(HEART, { r: '#F83800' }, 244 - i * 9, 4);
+    text(String(W.score).padStart(6, '0'), 252, 14, dark ? '#FCFCFC' : '#000', 'right');
+    if (!W.cascadeGame) text(`CUP ${W.U} m/s`, MAST_X + 6, 24, dark ? '#FCFCFC' : '#000');
+    if (P.name && !W.cascadeGame) text(P.name, 4, 14, dark ? '#7C7C7C' : '#24185C');
+    if (!dark && !W.cascadeGame) { rect(6, 92, Math.round(100 * PXM), 2, '#000'); text('100 m', 6, 84, '#000'); }
+  }
+  requestAnimationFrame(draw);
+}
+
+/* ======================= dialog ======================= */
+const dlg = document.getElementById('dlg'), dtxt = document.getElementById('dtxt'), dopts = document.getElementById('dopts');
+let typing = null;
+const ASCII = { 'ℓ': 'L', '′': "'", '’': "'", '‘': "'", '“': '"', '”': '"', '·': '-', '×': 'x', '→': '->', '≈': '~', '∝': '~',
+  '—': '-', '–': '-', '−': '-', '…': '...', 'Ø': 'O', 'ø': 'o', 'Å': 'Aa', 'å': 'aa', 'Æ': 'Ae', 'æ': 'ae', '±': '+/-', '²': '2', '½': '1/2' };
+const toAscii = str => String(str).replace(/[^\x00-\x7F]/g, ch => ASCII[ch] ?? '');
+function say(s, opts = ['OK'], extraHTML = '') {
+  s = toAscii(s); opts = opts.map(toAscii);
+  return new Promise(res => {
+    dlg.hidden = false; dopts.innerHTML = ''; dtxt.textContent = ''; let i = 0, fin = false; clearInterval(typing);
+    const finish = () => { if (fin) return; fin = true; clearInterval(typing); dtxt.textContent = s;
+      dopts.innerHTML = extraHTML + opts.map((o, k) => `<button class="nes" data-k="${k}">${o}</button>`).join('');
+      dopts.querySelectorAll('button').forEach(b => b.onclick = () => { dlg.hidden = true; res(+b.dataset.k); });
+      const inp = dopts.querySelector('input');
+      if (inp) inp.onkeydown = e => { if (e.key === 'Enter') dopts.querySelector('button').click(); };
+      (inp || dopts.querySelector('button')).focus({ preventScroll: true }); };
+    typing = setInterval(() => { i += 2; dtxt.textContent = s.slice(0, i); if (i % 6 === 0) tone(880, 0.02, 0.02); if (i >= s.length) finish(); }, 22);
+    dlg.onclick = e => { if (e.target === dlg || e.target === dtxt) finish(); };
+  });
+}
+async function askName() {
+  let saved = ''; try { saved = localStorage.getItem('eddyName') || ''; } catch (e) {}
+  for (;;) {
+    const p = say('ENTER A NICKNAME\n\nUp to 12 letters or digits. No real names: it goes on the class leaderboard.', ['Start'],
+      `<input class="name" id="nm" maxlength="12" autocomplete="off" value="${saved}" aria-label="Nickname"><br>`);
+    await p;
+    const v = ((document.getElementById('nm') || {}).value || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 12);
+    if (v) { P.name = v; try { localStorage.setItem('eddyName', v); } catch (e) {} return; }
+    saved = '';
+  }
+}
+
+/* ======================= console (keys = eddy sizes) ======================= */
+const conEl = document.getElementById('console');
+conEl.innerHTML = SIZES.map((_, j) => `<div class="col"><div class="eqbox"><div class="ghost"></div><div class="fill" style="background:${COLORS[j]}"></div><div class="cap"></div>
+  <input type="range" min="0" max="1" step="0.05" value="0" data-j="${j}" aria-label="strength of ${NAMES[j]} eddies"></div>
+  <button class="key" data-j="${j}" style="background:${COLORS[j]}"><span class="meter"></span><span class="lbl">${NAMES[j]}</span><span class="kb">${KEYS[j]}</span></button></div>`).join('');
+const keyEls = [...conEl.querySelectorAll('.key')], sliders = [...conEl.querySelectorAll('.eqbox input')];
+const lv = new Array(8).fill(0);
+function setMeter(j, v) {        // analyser reading: bar inside the key (sizes-only levels) and dashed ghost behind the fader
+  keyEls[j].querySelector('.meter').style.height = Math.round(Math.min(1, v) * 100) * 0.4 + 'px';
+  const gh = sliders[j].parentElement.querySelector('.ghost'); gh.style.height = Math.min(100, Math.round(100 * v)) + '%'; gh.style.display = v > 0.02 ? 'block' : 'none';
+}
+function showLevel(j) { keyEls[j].classList.toggle('sel', lv[j] > 0);
+  const box = sliders[j].parentElement, pct = Math.round(100 * lv[j]) + '%';
+  box.querySelector('.fill').style.height = pct; box.querySelector('.cap').style.bottom = pct; sliders[j].value = lv[j]; }
+const clearKeys = () => keyEls.forEach((_, j) => { lv[j] = 0; setMeter(j, 0); showLevel(j); });
+let onSlide = null;
+sliders.forEach(sl => sl.addEventListener('input', () => { if (!onSlide || !dlg.hidden) { sl.value = lv[+sl.dataset.j]; return; } onSlide(+sl.dataset.j, +sl.value); }));
+let onKey = null, onSend = null, onReplay = null, onKeyUp = null;
+function press(j) { if (!dlg.hidden || !onKey) return; keyEls[j].classList.add('down'); setTimeout(() => keyEls[j].classList.remove('down'), 120); onKey(j); }
+keyEls.forEach(k => k.addEventListener('pointerdown', e => { e.preventDefault(); press(+k.dataset.j); }));
+keyEls.forEach(k => ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => k.addEventListener(ev, () => onKeyUp && onKeyUp(+k.dataset.j))));
+addEventListener('keyup', e => { const j = KEYS.indexOf(e.key.toUpperCase()); if (j >= 0 && onKeyUp) onKeyUp(j); });
+const randn = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+document.getElementById('send').onclick = () => onSend && dlg.hidden && onSend();
+document.getElementById('replay').onclick = () => onReplay && dlg.hidden && onReplay();
+addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT' && e.target.type !== 'range') return;   // range faders still get A-K and Enter
+  const j = KEYS.indexOf(e.key.toUpperCase());
+  if (j >= 0 && !e.repeat) press(j);
+  else if (e.key === 'Enter' && onSend && dlg.hidden) { e.preventDefault(); onSend(); }
+  else if (e.key.toUpperCase() === 'R' && onReplay && dlg.hidden) onReplay();
+});
+const setButtons = (send, replay) => { document.getElementById('send').disabled = !send; document.getElementById('replay').disabled = !replay; };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const win = () => { sfxGood(); W.beam = performance.now() + 1200; };
+const lose = () => { sfxBad(); W.shake = 1; setTimeout(() => W.shake = 0, 600); W.lives--; };
+
+const hear = (dur = 1.8) => W.rows.forEach(r => tone(K_AUDIO * W.U / r.ell, dur, 0.08 * r.A));
+function analyse(j, Ucal) {   // projection of the sonic signal on key j's frequency (labels assume U = Ucal)
+  const f = Ucal / SIZES[j]; let a = 0, b = 0;
+  for (let n = 0; n < N_SCAN; n++) { const t = n * T_SCAN / N_SCAN; let v = 0;
+    for (const r of W.rows) v += r.A * Math.sin(2 * Math.PI * (W.U / r.ell) * t + r.ph);
+    a += v * Math.cos(2 * Math.PI * f * t); b += v * Math.sin(2 * Math.PI * f * t); }
+  return 2 * Math.hypot(a, b) / N_SCAN;
+}
+const scansEl = document.getElementById('scans');
+const pick = (n, pool) => { const p = [...pool], out = []; while (out.length < n) out.push(p.splice(Math.floor(Math.random() * p.length), 1)[0]); return out.sort((a, b) => a - b); };
+const names = ks => ks.length ? ks.map(k => NAMES[k]).join(' + ') : 'nothing';
+const sameSet = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+const chosen = () => lv.map((v, j) => v ? j : -1).filter(j => j >= 0);
+
+/* one round: the ship blows `spec` = [{k, level 1..3}]; mode 'toggle' (sizes only) or 'eq' (sizes + strengths) */
+async function round({ spec, U, night, analyser, mode, Ucal = 8, listen = 7 }) {
+  let cleanup = () => {};
+  W.U = U; W.night = night; W.rows = spec.map(s => ({ k: s.k, ell: SIZES[s.k], A: s.A, ph: Math.random() * 6.283 }));
+  W.trace = []; clearKeys(); document.body.classList.toggle('eqmode', mode === 'eq');
+  scansEl.textContent = '';
+  if (mode === 'eq' && !P.faderHintDone) document.body.classList.add('faderhint');
+  await sleep(700); hear(); setButtons(true, true); onReplay = () => hear();
+  return new Promise(res => {
+    if (mode === 'eq') {
+      // The analyser estimates a size's strength from a finite piece of signal: each 50 ms adds one noisy sample,
+      // and the reading is the running mean, so it wobbles at first and settles as sqrt(time).
+      const truthProj = SIZES.map((_, j) => analyse(j, Ucal)), sum = new Array(8).fill(0), cnt = new Array(8).fill(0);
+      let budget = listen, listening = -1;
+      const status = () => scansEl.textContent = `LISTENING TIME LEFT: ${budget.toFixed(1)} s  |  HOLD A KEY TO LISTEN, THEN DRAG ITS FADER (OR ARROW KEYS)`;
+      status();
+      const iv = setInterval(() => {
+        if (listening < 0 || budget <= 0) return;
+        budget = Math.max(0, budget - 0.05); cnt[listening]++; sum[listening] += truthProj[listening] + 0.6 * randn();
+        setMeter(listening, Math.max(0, sum[listening] / cnt[listening])); status();
+      }, 50);
+      cleanup = () => clearInterval(iv);
+      onKey = j => { tone(K_AUDIO * Ucal / SIZES[j], 0.3, 0.1); sliders[j].focus({ preventScroll: true }); listening = j; };
+      onKeyUp = j => { if (listening === j) listening = -1; };
+      let last = 0;
+      onSlide = (j, v) => { lv[j] = v; showLevel(j); if (!P.faderHintDone) { P.faderHintDone = true; document.body.classList.remove('faderhint'); } const now = performance.now(); if (now - last > 120 && v > 0) { last = now; tone(K_AUDIO * Ucal / SIZES[j], 0.15, 0.1 * v); } };
+    } else {
+      onKey = j => { lv[j] = lv[j] ? 0 : 1; tone(K_AUDIO * Ucal / SIZES[j], 0.3, lv[j] ? 0.1 : 0.03);
+        if (analyser) setMeter(j, analyse(j, Ucal)); showLevel(j); };
+    }
+    onSend = () => { cleanup(); onKey = onSend = onReplay = onSlide = onKeyUp = null; setButtons(false, false); res(lv.slice()); };
+  });
+}
+async function lightning() { thunder(); for (const ms of [120, 90, 700]) { W.flashUntil = performance.now() + ms; await sleep(ms + 120); } }
+
+/* ======================= story ======================= */
+async function intro() {
+  P.introSeen = true;
+  W.night = true; W.U = 8; W.rows = []; W.shipHidden = true; W.planet = false; W.hud = 'OSTERILD 03:12';
+  const skip = await say(`OSTERILD TEST SITE, DENMARK - 03:12\n\nDr. ${P.name}, you are on night duty at the 103 m met mast. The sonic hums along at 20 samples a second. Nothing unusual.`, ['Continue', 'Skip the story']);
+  if (skip === 1) { W.shipHidden = false; W.night = false; return; }
+  W.shipHidden = false;
+  for (let k = 0; k <= 40; k++) { W.shipDY = -70 + k * 1.75; if (k % 8 === 0) tone(60 + k, 0.2, 0.05, 'triangle'); await sleep(45); }
+  W.shipDY = 0;
+  await say('Something comes down out of the dark and stops upwind of the mast. It makes no sound at all.\n\nThen the sonic goes wild.', ['Look closer']);
+  W.night = false; W.planet = true;
+  W.rows = [{ ell: SIZES[3], A: 1, ph: 0 }, { ell: SIZES[6], A: 0.6, ph: 1 }]; hear(2.2);
+  await say('THE WHORLS\n\nThey come from a gas giant with no solid ground, where every living thing is a vortex. The oldest of them is a storm older than our species.\n\nThey have no voices. They talk by stirring the air: their words are eddies.', ['Continue']);
+  await say('Their probe has listened to Earth for years through the only ears tuned to their language: met-mast sonics like yours.\n\nNow they want an answer. Prove that humans understand wind, and they will send their full message.', ['Continue']);
+  W.rows = []; W.planet = false;
+  await say('YOUR TOOLS\n\n· the sonic: u′(t), 20 times a second\n· the cup: the mean wind U\n- Taylor (Lecture 5): an eddy of size L takes L/U seconds to pass the mast, so the sonic reading goes up and down once every L/U seconds, i.e. at f = U/L\n\nThree tests. Then the message.', ['Begin test 1']);
+}
+
+/* ======================= levels ======================= */
+async function level1() {
+  W.hud = 'LV1 DAYLIGHT'; W.lives = 3; P.level = 1;
+  await say('TEST 1 OF 3 · DAYLIGHT\n\nThe Whorls start simple: one eddy size at a time. The wind carries the eddies past the mast and the sonic turns them into sound.\n\nWhich eddy size is it blowing? Use both clues: the size you see and the pitch you hear. Tap keys to hear each size, select one, TRANSMIT.');
+  for (const k of pick(3, [0, 1, 2, 3, 4, 5, 6, 7])) {
+    const ans = await round({ spec: [{ k, A: 1 }], U: 8, night: false, analyser: false, mode: 'toggle' });
+    const sent = ans.map((v, j) => v ? j : -1).filter(j => j >= 0);
+    if (sameSet(sent, [k])) { win(); W.score += 200; await sleep(800); }
+    else { lose(); if (W.lives <= 0) { await say('The ship flies off. Try again.', ['Restart level']); return level1(); }
+           await say(`Not quite: those were ${NAMES[k]} eddies. You sent ${names(sent)}.\n\nBigger eddies take longer to pass the mast, so they sound lower.`, ['Next']); }
+  }
+  W.rows = [];
+  await say('Contact!\n\nA row of eddies of size L carried past at speed U makes the sonic reading go up and down once every L/U seconds, i.e. at f = U/L. Big eddies, low notes.', ['Next level']);
+}
+
+async function level2() {
+  W.hud = 'LV2 EQUALIZER'; W.lives = 3; P.level = 2;
+  await say('TEST 2 OF 3 · EQUALIZER\n\nNow whole sentences: several sizes at once, some stronger than others. Strong eddies look brighter, sound louder and push the sonic reading further up and down.\n\nEach size has a fader above its key: drag it with the mouse (or press the key, then use the arrow keys) to set the strength you think is in the wind.\n\nHOLD a key to let the analyser listen to that size. Its dashed reading wobbles at first and settles the longer it listens, but listening time is limited. Use your eyes and ears to decide where to listen.');
+  for (const [n, listen] of [[2, 7], [3, 7], [3, 7]]) {
+    const spec = pick(n, [0, 1, 2, 3, 4, 5, 6, 7]).map(k => ({ k, A: Math.round((0.3 + 0.7 * Math.random()) * 20) / 20 }));
+    const ans = await round({ spec, U: 8, night: false, analyser: true, mode: 'eq', listen });
+    const truth = new Array(8).fill(0); spec.forEach(s => truth[s.k] = s.A);
+    // share of the sonic signal reproduced: 1 − var(residual)/var(signal), phases matched
+    const num = truth.reduce((s, v, j) => s + (v - ans[j]) ** 2, 0), den = truth.reduce((s, v) => s + v * v, 0);
+    const matched = Math.max(0, 1 - num / den), pct = Math.round(100 * matched);
+    const list = spec.map(s => `${NAMES[s.k]} at ${Math.round(100 * s.A)}%`).join(', ');
+    spec.forEach(s => setMeter(s.k, s.A));          // reveal the true equalizer
+    if (matched >= 0.75) { win(); W.score += Math.round(500 * matched);
+      await say(`${pct >= 95 ? 'Perfect!' : 'Decoded.'} You matched ${pct}% of the sonic signal.\nThe ship blew: ${list}.`, ['Next']); }
+    else { lose(); await say(`Garbled: only ${pct}% of the signal matched.\nThe ship blew: ${list} (dashed lines).\n\nSizes that aren't in the wind read almost zero on the analyser.`, [W.lives > 0 ? 'Next' : 'Restart level']);
+           if (W.lives <= 0) return level2(); }
+  }
+  W.rows = []; document.body.classList.remove('eqmode', 'faderhint');
+}
+
+async function level3() {
+  W.hud = 'LV3 NIGHT STORM'; W.lives = 3; W.night = true; W.U = 16; W.rows = []; P.level = 3;
+  await say('TEST 3 OF 3 · NIGHT STORM\n\nThe Whorls keep the hardest idea for last. Night, and a storm front: the cup reads 16 m/s. You can\'t see the eddies any more. You only have the sonic, exactly like a real mast.\n\nYour analyser was calibrated yesterday at 8 m/s. It hears a frequency f and labels it with a size L = 8/f: it assumes U = 8 m/s.\n\nTransmit the true eddy sizes. Lightning will show you if you were right.');
+  let first = true;
+  for (const n of [1, 2, 2]) {
+    const ks = pick(n, [0, 1, 2]);
+    const ans = await round({ spec: ks.map(k => ({ k, A: 1 })), U: 16, night: true, analyser: true, mode: 'toggle', Ucal: 8 });
+    const sent = ans.map((v, j) => v ? j : -1).filter(j => j >= 0), lit = ks.map(k => k + 5);
+    if (first) { P.stormTrap = sameSet(sent, lit); first = false; }
+    await lightning();
+    const L0 = Math.round(SIZES[lit[0]]), L1 = 2 * L0;
+    const f0 = Number.isInteger(L0 / 8) ? `1/${L0 / 8}` : (8 / SIZES[lit[0]]).toFixed(3);
+    const why = `The sonic hears f = U/L. Your analyser turns f back into a size with L = 8/f, because it assumes U = 8 m/s. `
+      + `But the wind is U = 16 m/s, so the true size is L = 16/f = 2 x (8/f): twice what the analyser says.\n\n`
+      + `Example: the analyser lit ${L0} m, so f = 8/${L0} = ${f0} Hz. At 16 m/s, that f means L = 16/f = 16 x ${L0}/8 = ${L1} m.\n\n`
+      + `A frequency is only a size once you know U.`;
+    if (sameSet(sent, ks)) { win(); W.score += 400; await say(`Lightning shows ${names(ks)} eddies. Correct!\n\n${why}`, ['Next']); }
+    else { lose(); await say(`Lightning shows ${names(ks)} eddies. You sent ${names(sent)}.\n\n${why}`, [W.lives > 0 ? 'Next' : 'Restart level']);
+           if (W.lives <= 0) return level3(); }
+  }
+  W.rows = []; W.night = false; W.U = 8;
+}
+
+async function finale() {
+  W.hud = 'THE CASCADE'; W.rows = []; W.night = false; W.U = 8; P.level = 4;
+  const guess = await say('THE MESSAGE\n\nYou passed. The Whorls send their full message. It starts with one giant eddy, which will break into smaller and smaller ones.\n\nPredict: will the small eddies be stronger or weaker than the big one?', ['Stronger', 'The same', 'Weaker']);
+  P.finaleGuess = ['stronger', 'same', 'weaker'][guess];
+  const C = await cascadeGame();
+  W.score += C.score + (guess === 2 ? 300 : 0);
+  await say(`${guess === 2 ? 'Right: weaker. +300' : 'Weaker, in fact.'}\n\nEnergy that passed each step: into BIG ${C.flow[0]}, BIG to MEDIUM ${C.flow[1]}, MEDIUM to SMALL ${C.flow[2]}, out as HEAT ${C.flow[3]}. The same flow went through every size.\n\nEach container held (flow) x (time its eddies need to ripen). Smaller eddies ripen faster, so they hold less energy: the bars follow L^(2/3). That staircase is the -5/3 spectrum, per band. Efficiency: ${C.eff} % of the energy reached heat.`, ['Translate the message']);
+  await say('PARTIAL TRANSLATION\n\n   Big whorls have little whorls\n   that feed on their velocity,\n   and little whorls have lesser whorls\n   and so on to viscosity.\n\nOn Earth, the meteorologist L. F. Richardson wrote exactly these lines in 1922. The Whorls are delighted.', ['And the rest?']);
+  await say('THE REST OF THE MESSAGE\n\nThe real message is ten minutes of wind with thousands of eddy sizes at once. No ear can decode it. Your analyser could, one size at a time, if you build it yourself.\n\nYOUR MISSION · ROUND 1\nBuild the analyser in Colab and decode real Osterild wind: which eddy sizes carry the wind, and how much?', ['See the leaderboard']);
+  C.close();
+  await submitAndShow();
+  W.spectrum = null; W.rows = []; W.ghost = []; W.score = 0; P.stormTrap = null; P.finaleGuess = ''; return start();
+}
+
+/* ======================= the cascade: containers ======================= */
+/* Three eddy sizes, a factor 4 apart. The ship drops BIG eddies at a steady energy rate eps. An eddy can break only
+   after its turnover time T ~ L^(2/3) eps^(-1/3) (timer ring full, then it glows). BIG (9 units) -> 3 MEDIUM (3 units);
+   MEDIUM -> 3 SMALL (1 unit). Below 20 m the cascade carries on by itself to ~1 mm, where viscosity makes heat.
+   Breaking too soon wastes the eddy's energy and jams the key. A container holds (flow) x (ripening time): Little's law,
+   so the energy held per size goes as L^(2/3), the -5/3 spectrum per band. Runs at 384x216 on the same canvas.        */
+async function cascadeGame() {
+  const LV = [{ name: 'BIG', L: 320, r: 12, units: 9, col: '#3CBCFC' }, { name: 'MEDIUM', L: 80, r: 7, units: 3, col: '#00E8D8' },
+              { name: 'SMALL', L: 20, r: 3.5, units: 1, col: '#BCBCBC' }];
+  const TBIG = 3.0, BOX = [{ x: 22, y: 46, w: 128, h: 66, cap: 6 }, { x: 150, y: 104, w: 118, h: 56, cap: 14 }, { x: 262, y: 148, w: 76, h: 46, cap: 30 }];
+  const VENT = { x: 368, y: 186 };
+  const saved = keyEls.map(k => k.innerHTML);
+  keyEls.forEach((k, j) => { if (j === 0) k.innerHTML = '<span class="lbl">BREAK BIG</span><span class="kb">A</span>';
+    else if (j === 1) k.innerHTML = '<span class="lbl">BREAK MEDIUM</span><span class="kb">S</span>'; else k.style.visibility = 'hidden'; });
+  W.cascadeMode = true; cv.width = 384; cv.height = 216; g.imageSmoothingEnabled = false;
+  const S = { t: 0, eps: 1, eddies: [], sparks: [], pops: [], score: 0, spill: 0, waste: 0, jam: [0, 0], dropClock: 0, gusted: false,
+              running: false, held: [0, 0, 0], heldT: 0, flow: [0, 0, 0, 0], inRate: 0, outRate: 0, lastIn: 0, lastOut: 0, banner: '', result: null };
+  const rnd = (a, b) => a + (b - a) * Math.random();
+  const T = lv => TBIG * Math.pow(LV[0].L / LV[lv].L, -2 / 3) * Math.pow(S.eps, -1 / 3);
+  const dropEvery = () => (S.t < 10 ? 3.0 : 2.0) / S.eps;
+  const ripe = e => e.state === 'in' && e.age >= T(e.lv);
+  const inBox = lv => S.eddies.filter(e => e.lv === lv && (e.state === 'in' || e.target === lv)).length;
+  function spawn(lv, x0, y0) {
+    const b = BOX[lv];
+    if (inBox(lv) >= b.cap) {
+      S.eddies.push({ lv, state: 'spill', x: x0, y: y0, vx: rnd(-20, 20), vy: -30, age: 0, spin: 0 });
+      S.spill += LV[lv].units; S.score = Math.max(0, S.score - 20);
+      S.pops.push({ txt: 'SPILL!', x: b.x + b.w / 2, y: b.y - 8, until: performance.now() + 700, col: '#F83800' }); tone(80, 0.15, 0.08, 'sawtooth'); return;
+    }
+    const tx = rnd(b.x + LV[lv].r + 3, b.x + b.w - LV[lv].r - 3), ty = rnd(b.y + LV[lv].r + 12, b.y + b.h - LV[lv].r - 3);
+    S.eddies.push({ lv, state: 'fall', target: lv, x0, y0, x: x0, y: y0, tx, ty, ft: 0, age: 0, spin: rnd(0, 6), vx: rnd(-6, 6), vy: rnd(-4, 4) });
+  }
+  function breakEddy(e) {
+    e.state = 'gone';
+    for (let i = 0; i < 3; i++) spawn(e.lv + 1, e.x + rnd(-4, 4), e.y + rnd(-4, 4));
+    S.flow[e.lv + 1] += LV[e.lv].units; S.score += 10; tone(e.lv === 0 ? 196 : 392, 0.12, 0.09);
+    for (let i = 0; i < 6; i++) S.sparks.push({ x: e.x, y: e.y, vx: rnd(-40, 40), vy: rnd(-40, 20), life: 0.3, col: LV[e.lv].col });
+  }
+  function fumble(lv, target) {
+    const now = performance.now(), b = BOX[lv];
+    const victim = target || S.eddies.filter(e => e.lv === lv && e.state === 'in').sort((a, c) => a.age - c.age)[0];
+    if (victim) { victim.state = 'gone'; S.waste += LV[lv].units;
+      for (let i = 0; i < 10; i++) S.sparks.push({ x: victim.x, y: victim.y, vx: rnd(-60, 60), vy: rnd(-60, 30), life: 0.4, col: '#F83800' }); }
+    S.score = Math.max(0, S.score - 15); S.jam[lv] = now + 900;
+    S.pops.push({ txt: 'TOO SOON! WASTED', x: b.x + b.w / 2, y: b.y - 8, until: now + 800, col: '#F83800' }); tone(70, 0.25, 0.1, 'sawtooth');
+  }
+  function playerBreak(lv) {
+    if (!S.running || performance.now() < S.jam[lv]) return;
+    const c = S.eddies.filter(e => e.lv === lv && ripe(e)).sort((a, b) => b.age - a.age)[0];
+    if (c) breakEddy(c); else fumble(lv);
+  }
+  onKey = j => { if (j < 2) playerBreak(j); };
+  const onPtr = ev => {
+    if (!S.running) return;
+    const r = cv.getBoundingClientRect(), x = (ev.clientX - r.left) * 384 / r.width, y = (ev.clientY - r.top) * 216 / r.height;
+    const hit = S.eddies.filter(e => e.state === 'in' && e.lv < 2 && Math.hypot(e.x - x, e.y - y) < LV[e.lv].r + 5).sort((a, b) => b.age - a.age)[0];
+    if (!hit || performance.now() < S.jam[hit.lv]) return;
+    if (ripe(hit)) breakEddy(hit); else fumble(hit.lv, hit);
+  };
+  cv.addEventListener('pointerdown', onPtr);
+
+  function update(dt) {
+    if (!S.running) return;
+    S.t += dt;
+    if (!S.gusted) S.banner = S.t < 10 ? 'WARMING UP: CLICK GLOWING EDDIES (OR A / S)' : 'CLICK GLOWING EDDIES (OR PRESS A / S)';
+    S.dropClock += dt;
+    if (S.dropClock >= dropEvery()) { S.dropClock = 0; spawn(0, 70, 30); S.flow[0] += LV[0].units; tone(110, 0.1, 0.05, 'triangle'); }
+    for (const e of S.eddies) {
+      e.spin += dt * 6 / LV[e.lv].r * (e.lv === 0 ? 1 : 1.6);
+      if (e.state === 'fall') {
+        e.ft += dt / 0.55; const q = Math.min(1, e.ft);
+        e.x = e.x0 + (e.tx - e.x0) * q; e.y = e.y0 + (e.ty - e.y0) * q - 18 * Math.sin(Math.PI * q) * (e.lv === 0 ? 0.3 : 1);
+        if (q >= 1) { e.state = 'in'; e.target = undefined; }
+      } else if (e.state === 'in') {
+        e.age += dt; const b = BOX[e.lv], r = LV[e.lv].r;
+        e.x += e.vx * dt; e.y += e.vy * dt;
+        if (e.x < b.x + r + 2 || e.x > b.x + b.w - r - 2) e.vx *= -1;
+        if (e.y < b.y + r + 12 || e.y > b.y + b.h - r - 2) e.vy *= -1;
+        e.x = Math.max(b.x + r + 2, Math.min(b.x + b.w - r - 2, e.x)); e.y = Math.max(b.y + r + 12, Math.min(b.y + b.h - r - 2, e.y));
+        if (e.lv === 2 && ripe(e)) { e.state = 'gone'; S.flow[3] += LV[2].units;
+          S.sparks.push({ x: e.x, y: e.y, tx: VENT.x, ty: VENT.y, heat: true, life: 0.6, col: '#F83800' }); }
+      } else if (e.state === 'spill') { e.vy += 120 * dt; e.x += e.vx * dt; e.y += e.vy * dt; if (e.y > 230) e.state = 'gone'; }
+    }
+    S.eddies = S.eddies.filter(e => e.state !== 'gone');
+    for (const p of S.sparks) { p.life -= dt; if (p.heat) { p.x += (p.tx - p.x) * Math.min(1, dt * 5); p.y += (p.ty - p.y) * Math.min(1, dt * 5); } else { p.x += p.vx * dt; p.y += p.vy * dt; } }
+    S.sparks = S.sparks.filter(p => p.life > 0);
+    if (S.t > 8) { S.heldT += dt; for (let lv = 0; lv < 3; lv++) S.held[lv] += dt * LV[lv].units * S.eddies.filter(e => e.lv === lv && e.state === 'in').length; }
+    const a = Math.min(1, dt / 3);
+    S.inRate += a * ((S.flow[0] - S.lastIn) / dt - S.inRate); S.lastIn = S.flow[0];
+    S.outRate += a * ((S.flow[3] - S.lastOut) / dt - S.outRate); S.lastOut = S.flow[3];
+  }
+  const crect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
+  const ctext = (s_, x, y, c = '#FCFCFC', al = 'left') => { g.fillStyle = c; g.font = '8px "Press Start 2P", monospace'; g.textAlign = al; g.textBaseline = 'top'; g.fillText(toAscii(s_), Math.round(x), Math.round(y)); };
+  const ccircle = (x, y, r, c, fill) => { g.beginPath(); g.arc(Math.round(x), Math.round(y), r, 0, 2 * Math.PI); if (fill) { g.fillStyle = c; g.fill(); } else { g.strokeStyle = c; g.lineWidth = 1; g.stroke(); } };
+  function drawEddy(e, now) {
+    const L = LV[e.lv], r = L.r, rp = ripe(e), glow = rp && Math.floor(now / 160) % 2 === 0, col = rp ? '#F8B800' : L.col;
+    if (rp) ccircle(e.x, e.y, r + 2, glow ? 'rgba(248,184,0,0.5)' : 'rgba(248,184,0,0.25)', true);
+    ccircle(e.x, e.y, r, col, false);
+    g.strokeStyle = col; g.lineWidth = 1;
+    for (let k = 0; k < 2; k++) { g.beginPath();
+      for (let q = 0; q <= 1.0001; q += 0.1) { const an = e.spin + k * Math.PI + q * 3.2, rr = r * q; q ? g.lineTo(e.x + rr * Math.cos(an), e.y + rr * Math.sin(an)) : g.moveTo(e.x + rr * Math.cos(an), e.y + rr * Math.sin(an)); }
+      g.stroke(); }
+    if (e.state === 'in' && !rp && e.lv < 2) { g.beginPath(); g.strokeStyle = '#F8B800'; g.lineWidth = 1.5; g.arc(e.x, e.y, r + 2.5, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * e.age / T(e.lv)); g.stroke(); }
+  }
+  function box(b, lv) {
+    crect(b.x, b.y, b.w, b.h, 'rgba(60,188,252,0.07)');
+    g.strokeStyle = '#BCBCBC'; g.lineWidth = 2; g.beginPath(); g.moveTo(b.x, b.y); g.lineTo(b.x, b.y + b.h); g.lineTo(b.x + b.w, b.y + b.h); g.lineTo(b.x + b.w, b.y); g.stroke();
+    crect(b.x + 3, b.y + 6, 2, b.h - 12, 'rgba(252,252,252,0.25)');
+    const full = S.eddies.filter(e => e.lv === lv && e.state === 'in').length / b.cap;
+    crect(b.x + b.w - 6, b.y + b.h - 3 - (b.h - 8) * Math.min(1, full), 3, (b.h - 8) * Math.min(1, full), full > 0.8 ? '#F83800' : '#58D854');
+    ctext(`${LV[lv].name} ${LV[lv].L} m`, b.x + 8, b.y + 3, '#BCBCBC');
+  }
+  let alive = true;
+  function frame(now) {
+    if (!alive) return;
+    for (let y = 0; y < 216; y += 4) crect(0, y, 384, 4, `rgb(${10 + y / 8 | 0},${8 + y / 10 | 0},${40 + y / 4 | 0})`);
+    const sx = 70 + (W.shake ? Math.round(Math.sin(now / 16) * 2) : 0), sy = 18 + Math.round(Math.sin(now / 600) * 1.5);
+    g.fillStyle = '#3CBCFC'; g.beginPath(); g.ellipse(sx, sy - 3, 9, 6, 0, Math.PI, 0); g.fill();
+    g.fillStyle = '#BCBCBC'; g.beginPath(); g.ellipse(sx, sy + 1, 26, 5, 0, 0, 2 * Math.PI); g.fill();
+    for (let i = 0; i < 5; i++) crect(sx - 18 + i * 9, sy, 3, 2, (Math.floor(now / 250) + i) % 5 ? '#AC7C00' : '#F8B800');
+    ctext('ENERGY IN', sx + 32, sy - 4, '#3CBCFC');
+    g.strokeStyle = '#3C3C3C'; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(BOX[0].x + BOX[0].w, BOX[0].y + BOX[0].h - 8); g.lineTo(BOX[1].x + 30, BOX[0].y + BOX[0].h - 8); g.lineTo(BOX[1].x + 30, BOX[1].y); g.stroke();
+    g.beginPath(); g.moveTo(BOX[1].x + BOX[1].w, BOX[1].y + BOX[1].h - 8); g.lineTo(BOX[2].x + 26, BOX[1].y + BOX[1].h - 8); g.lineTo(BOX[2].x + 26, BOX[2].y); g.stroke();
+    g.beginPath(); g.moveTo(BOX[2].x + BOX[2].w, BOX[2].y + 10); g.lineTo(VENT.x, VENT.y); g.stroke();
+    ccircle(VENT.x + 6, VENT.y, 8, `rgba(248,56,0,${0.4 + 0.3 * Math.sin(now / 120)})`, true); ctext('HEAT ~1 mm', 382, 198, '#F83800', 'right');
+    box(BOX[0], 0); box(BOX[1], 1); box(BOX[2], 2);
+    ctext('goes on', BOX[2].x + 8, BOX[2].y + BOX[2].h - 10, '#7C7C7C');
+    [[3.0], [2.2], [1.5], [1]].forEach(([r], i) => ccircle(BOX[2].x + BOX[2].w + 6 + i * 6, BOX[2].y + 14 + i * 7, r, (now / 200 + i) % 4 < 2 ? '#BCBCBC' : '#7C7C7C', false));
+    for (const e of S.eddies) drawEddy(e, now);
+    for (const p of S.sparks) crect(p.x, p.y, 2, 2, p.col);
+    ctext('THE CASCADE', 4, 4, '#F8B800'); ctext(`SCORE ${S.score}`, 380, 4, '#FCFCFC', 'right');
+    ctext(S.banner, 192, 205, '#F8B800', 'center');
+    const meter = (v, x, lab, col) => { crect(x, 30, 40, 5, '#202020'); crect(x, 30, Math.min(40, 40 * v / 10), 5, col); ctext(lab, x, 20, col); };
+    meter(S.inRate, 250, 'IN', '#3CBCFC'); meter(S.outRate, 300, 'HEAT OUT', '#F83800');
+    S.pops = S.pops.filter(p => p.until > now); for (const p of S.pops) ctext(p.txt, p.x, p.y, p.col, 'center');
+    if (S.result) {
+      crect(40, 14, 304, 92, 'rgba(0,0,0,0.92)'); ctext('ENERGY HELD BY EACH SIZE', 192, 18, '#FCFCFC', 'center');
+      const mx = Math.max(...S.result, 1e-9);
+      S.result.forEach((v, i) => { const h = 58 * v / mx, th = 58 * Math.pow(LV[i].L / LV[0].L, 2 / 3);
+        crect(90 + i * 80, 92 - h, 44, h, LV[i].col); crect(86 + i * 80, 92 - th, 52, 2, '#FCFCFC'); ctext(`${LV[i].L} m`, 112 + i * 80, 95, '#BCBCBC', 'center'); });
+      ctext('line: L^(2/3)', 336, 30, '#FCFCFC', 'right');
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  let lastU = performance.now();
+  const uiv = setInterval(() => { const now = performance.now(), dt = Math.min(0.05, (now - lastU) / 1000); lastU = now; update(dt); }, 20);
+
+  await say('THE CASCADE\n\nThe ship pumps energy into the air as BIG eddies. Energy can only leave as heat, at about 1 mm, where viscosity acts.\n\nAn eddy can break once its timer ring is full: then it glows. Click it, or press A (big) / S (medium): it splits into three smaller eddies that fall into the next container. Below 20 m the cascade carries on by itself, too fast to follow.\n\nBreaking an eddy before it glows wastes its energy and jams the key. A full container spills.', ['Start']);
+  S.running = true; lastU = performance.now();
+  await new Promise(res => { const iv = setInterval(async () => {
+    if (!S.gusted && S.t > 30) {
+      S.running = false; S.gusted = true;
+      const k = await say('GUST! The ship doubles the energy it pumps in.\n\nWill each size have to pass its energy on faster or slower?', ['Faster', 'Slower', 'Same']);
+      await say(`${k === 0 ? 'Right.' : 'Faster.'} More energy per second has to flow through every size, and the eddies turn over faster too.`, ['Keep going']);
+      S.eps = 2; S.banner = 'GUST: MORE ENERGY IN, EVERYTHING FASTER'; lastU = performance.now(); S.running = true;
+    }
+    if (S.t > 50) { clearInterval(iv); res(); }
+  }, 50); });
+  S.running = false; clearInterval(uiv); onKey = null; cv.removeEventListener('pointerdown', onPtr);
+  S.result = S.held.map(h => h / Math.max(S.heldT, 1e-9));
+  const out = { score: S.score, flow: S.flow.slice(), eff: Math.round(100 * S.flow[3] / Math.max(1, S.flow[0])), held: S.result.slice(),
+    close() { alive = false; W.cascadeMode = false; cv.width = 256; cv.height = 144; g.imageSmoothingEnabled = false;
+      keyEls.forEach((k, j) => { k.innerHTML = saved[j]; k.style.visibility = ''; }); } };
+  window.__cascade = S;
+  return out;
+}
+
+/* ======================= class leaderboard ======================= */
+async function submitAndShow() {
+  const entry = { session: SESSION, name: P.name, score: W.score, level: P.level, stormTrap: P.stormTrap, finaleGuess: P.finaleGuess };
+  let board = null, where = '';
+  if (API_URL) {
+    try {
+      await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(entry) });
+      const r = await fetch(`${API_URL}?session=${encodeURIComponent(SESSION)}&score=${W.score}`); board = await r.json(); where = 'CLASS';
+    } catch (e) { board = null; }
+  }
+  if (!board) {           // fallback: this device only
+    let rows = []; try { rows = JSON.parse(localStorage.getItem('eddyBoard') || '[]'); } catch (e) {}
+    rows.push({ name: P.name, score: W.score }); rows.sort((a, b) => b.score - a.score);
+    try { localStorage.setItem('eddyBoard', JSON.stringify(rows.slice(0, 50))); } catch (e) {}
+    board = { top: rows.slice(0, 10), rank: rows.findIndex(r => r.name === P.name && r.score === W.score) + 1, players: rows.length };
+    where = API_URL ? 'THIS DEVICE (class board unreachable)' : 'THIS DEVICE';
+  }
+  const lines = (board.top || []).map((r, i) => `${String(i + 1).padStart(2, ' ')}. ${String(r.name).padEnd(12, ' ')} ${String(r.score).padStart(6, ' ')}`).join('\n');
+  await say(`LEADERBOARD · ${where}\n\n${lines || '(empty)'}\n\n${P.name}: ${W.score} points${board.rank ? `, rank ${board.rank} of ${board.players}` : ''}`, ['Play again']);
+}
+
+async function start() {
+  W.title = true; W.rows = [{ ell: 213, A: 1, ph: 0 }]; clearKeys(); setButtons(false, false);
+  await new Promise(res => { const go = e => { if (!dlg.hidden) return; removeEventListener('keydown', go); cv.removeEventListener('pointerdown', go); res(); };
+    addEventListener('keydown', go); cv.addEventListener('pointerdown', go); });
+  ac(); jingle([392, 523, 659, 784]); W.title = false; W.rows = [];
+  if (!P.name) await askName();
+  if (!P.introSeen) await intro();
+  await level1(); await level2(); await level3(); await finale();
+}
+
+(document.fonts ? document.fonts.load('8px "Press Start 2P"').catch(() => {}) : Promise.resolve()).finally(() => { requestAnimationFrame(draw); start(); });
+</script>
+</body>
+</html>

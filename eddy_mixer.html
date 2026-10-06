@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Eddy Mixer — 46100 Lecture 6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#030F4F; --blue:#2F3EEA; --red:#990000; --green:#1FD082; --grey:#DADADA;
+  --bg:#F6F7FB; --panel:#FFFFFF; --ink:#030F4F; --muted:#5A6185; --line:#D5D9EA;
+  --target:#8A90AD; --you:#2F3EEA; --good:#0E8F5A; --bad:#990000;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#050A2E; --panel:#0B1442; --ink:#EEF0FF; --muted:#A3A9CF; --line:#27306B;
+  --target:#7C83AE; --you:#7E89FF; --good:#1FD082; --bad:#FF6B6B; } }
+:root[data-theme="dark"]{ --bg:#050A2E; --panel:#0B1442; --ink:#EEF0FF; --muted:#A3A9CF; --line:#27306B;
+  --target:#7C83AE; --you:#7E89FF; --good:#1FD082; --bad:#FF6B6B; }
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Barlow,Arial,Helvetica,sans-serif;font-size:17px;line-height:1.45}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4em 1.2em;padding:14px 20px 8px;max-width:1100px;margin:0 auto}
+h1{font-family:"Barlow Condensed",Barlow,Arial,sans-serif;font-weight:600;font-size:2rem;margin:0;letter-spacing:.01em}
+h1 span{color:var(--blue)}
+nav{display:flex;gap:6px;margin-left:auto}
+nav button{font:inherit;font-weight:600;border:2px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:4px 14px;cursor:pointer}
+nav button[aria-current="true"]{border-color:var(--blue);background:var(--blue);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:0 20px 40px}
+.banner{background:#FFF4D6;color:#5A4300;border-radius:8px;padding:6px 12px;margin:0 0 10px;font-size:.9rem}
+.brief{margin:4px 0 12px;max-width:72ch}
+.brief strong{color:var(--blue)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+canvas{display:block;width:100%;}
+#scene{height:150px;border-radius:10px;background:linear-gradient(180deg,#DDE6FF,#F4F7FF)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) #scene{background:linear-gradient(180deg,#0E1A5A,#0B1442)} }
+#trace{height:230px;margin-top:10px}
+.legend{display:flex;gap:16px;font-size:.85rem;color:var(--muted);margin-top:4px}
+.legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:5px}
+.controls{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:flex-end;margin-top:12px}
+.field{display:flex;flex-direction:column;gap:3px;min-width:150px}
+.field label{font-size:.85rem;color:var(--muted)}
+.field input[type=number]{font:inherit;font-size:1.15rem;width:8ch;padding:4px 8px;border:2px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+input[type=range]{accent-color:var(--blue)}
+.btn{font:inherit;font-weight:700;font-size:1.05rem;border:none;border-radius:10px;padding:9px 18px;background:var(--blue);color:#fff;cursor:pointer}
+.btn.secondary{background:transparent;color:var(--blue);border:2px solid var(--blue)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+.feedback{margin-top:12px;min-height:2.6em;font-size:1.05rem}
+.feedback .good{color:var(--good);font-weight:700}
+.feedback .bad{color:var(--bad);font-weight:700}
+.shots{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:.9rem}
+.shots b{display:inline-block;width:14px;height:14px;border-radius:50%;background:var(--blue)}
+.shots b.used{background:var(--line)}
+/* equalizer */
+.eq{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;margin-top:12px}
+.band{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--bg);border-radius:8px;padding:6px 2px}
+.band .size{font-family:"Barlow Condensed",Barlow,Arial,sans-serif;font-weight:600;font-size:.95rem}
+.band .unit{font-size:.7rem;color:var(--muted);margin-top:-4px}
+.band input.amp{writing-mode:vertical-lr;direction:rtl;width:26px;height:120px}
+.band input.ph{width:100%}
+.band .phl{font-size:.68rem;color:var(--muted)}
+.band.active{outline:3px solid var(--green)}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:12px}
+.timer{font-family:"Barlow Condensed",Barlow,Arial,sans-serif;font-size:1.6rem;font-weight:600;min-width:3ch}
+.score{font-size:1.05rem}
+/* level 4 */
+.suspects{display:grid;gap:10px;margin-top:8px}
+.suspect{display:grid;grid-template-columns:3rem 1fr;align-items:center;gap:8px;background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:6px 10px;cursor:pointer;text-align:left;font:inherit;color:inherit}
+.suspect .tag{font-family:"Barlow Condensed",Barlow,Arial,sans-serif;font-size:2rem;font-weight:600;text-align:center}
+.suspect canvas{height:110px}
+.suspect.real{border-color:var(--good)} .suspect.fake{opacity:.55}
+.suspect.picked{box-shadow:0 0 0 4px var(--blue)}
+#specs{height:260px;display:none;margin-top:10px}
+@media (max-width:720px){
+  .eq{grid-template-columns:repeat(6,1fr)} .band input.amp{height:90px}
+  #trace{height:190px} h1{font-size:1.6rem}
+}
+@media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Eddy <span>Mixer</span></h1>
+  <nav aria-label="Levels">
+    <button data-l="1">Level 1</button><button data-l="2">Level 2</button>
+    <button data-l="3">Level 3</button><button data-l="4">Level 4</button>
+  </nav>
+</header>
+<main>
+  <div class="banner" id="placeholder" hidden>Placeholder wind: this build uses a synthetic trace. Run <code>export_trace_for_game.py</code> on the Østerild CSV before class.</div>
+  <p class="brief" id="brief"></p>
+  <section class="card" id="stage"></section>
+</main>
+
+<script>
+/*WIND_DATA_START*/const WIND = {"fs": 2, "U": 6.73, "placeholder": true, "u": [-0.285, -0.387, -0.13, -0.6, -0.659, -0.571, -0.441, -0.345, -0.187, -0.081, -0.079, -0.104, -0.16, -0.281, -0.127, -0.334, 0.166, 0.292, 0.079, 0.67, 0.493, 0.095, 0.381, 0.495, 0.516, 0.535, 0.797, 0.749, 0.798, 0.934, 0.973, 0.7, 0.346, 0.418, 0.124, 0.148, 0.082, -0.185, -0.227, -0.208, -0.109, -0.443, -0.327, -0.069, -0.025, 0.264, -0.031, 0.337, 0.514, 0.106, -0.315, -0.374, -0.597, -0.296, -0.153, -0.536, -0.679, -0.508, -0.597, -0.453, -0.509, -0.847, -0.502, -0.676, -0.6, -0.913, -0.818, -0.893, -1.074, -1.093, -0.618, -0.843, -0.504, -0.653, -0.932, -0.969, -0.744, -0.648, -0.685, -0.324, -0.491, -0.467, -0.522, -0.099, -0.722, -0.902, -0.695, -0.858, -0.65, -0.322, -0.84, -0.86, -0.499, -0.657, -1.072, -0.786, -0.895, -1.038, -1.019, -0.533, -0.486, -0.419, -0.555, -0.448, -0.296, 0.013, 0.469, -0.198, -0.004, 0.104, -0.097, -0.229, -0.896, -1.503, -1.191, -0.77, -0.924, -0.348, -0.673, -0.858, -1.001, -0.771, -0.136, -0.18, -0.167, -0.219, -0.667, -0.282, -0.159, 0.401, 0.047, -0.269, -0.039, -0.204, -0.69, -1.906, -2.096, -2.034, -1.028, -0.902, -0.579, -0.903, -1.02, -0.947, -1.301, -1.57, -0.65, -0.638, -0.92, -0.905, -0.311, 0.008, 0.111, 0.325, 0.195, 0.319, 0.209, 0.164, -0.129, 0.06, 0.037, -0.06, -0.34, -0.377, -0.308, -0.399, -0.636, -0.733, -0.779, -0.638, -0.413, -0.402, -0.192, 0.119, 0.025, 0.028, 0.015, 0.186, -0.132, -0.058, -0.229, -0.26, -0.408, -0.343, -0.115, 0.021, 0.126, 0.31, -0.062, 0.348, 0.219, -0.021, 0.028, 0.068, -0.062, 0.061, -0.015, 0.174, 0.241, 0.33, 0.465, 0.172, 0.382, 0.575, 0.135, -0.306, -0.193, 0.184, 0.129, 0.003, 0.265, 0.342, 0.109, 0.444, 0.601, 0.712, 0.739, 0.643, 0.703, 0.541, 0.776, 0.949, 0.804, 0.987, 1.319, 0.993, 0.907, 0.965, 0.866, 1.013, 1.001, 0.435, 0.429, 0.258, 0.395, 0.624, 1.102, 0.966, 0.857, 0.996, 1.422, 1.9, 1.957, 2.277, 1.276, 1.429, 2.05, 1.558, 0.756, 0.124, 0.35, 0.583, 1.176, 1.011, 0.589, -0.136, 0.406, 0.469, 0.919, 0.678, 1.45, 1.549, 1.301, 0.884, 0.956, 1.084, 1.064, 1.436, 1.26, 1.385, 1.079, 1.093, 0.915, 1.0, 1.41, 1.388, 1.385, 1.413, 1.542, 2.565, 2.814, 2.396, 2.585, 1.725, 1.113, 1.19, 0.752, 0.553, 0.603, 0.187, -0.04, 0.143, -0.208, 0.237, 0.737, 0.783, 0.464, 0.678, 0.781, 0.346, 0.26, 0.274, -0.287, -0.459, 0.258, 0.502, 1.066, 1.261, 1.384, 1.609, 1.348, 0.938, 0.728, 0.48, 0.16, 0.27, 0.664, 0.74, 0.922, 0.794, 0.775, 0.501, 0.656, 0.565, 0.545, 0.698, 0.421, 0.081, 0.353, -0.114, -0.218, 0.137, 0.342, 0.385, 0.207, 0.3, 0.087, 0.078, -0.148, -0.224, 0.057, 0.397, 0.01, -0.397, -0.072, 0.193, 0.044, 0.472, 0.26, -0.121, -0.26, -0.465, -0.536, -0.958, -0.873, -0.328, 0.036, -0.078, -0.121, 0.204, 0.021, 0.085, 0.366, 0.405, 0.25, 0.341, 0.643, 0.193, 0.054, -0.081, -0.166, 0.056, 0.729, 1.031, 0.927, 1.607, 1.585, 1.62, 1.84, 2.007, 2.25, 2.379, 2.2, 2.438, 2.268, 1.682, 1.646, 1.458, 1.875, 1.31, 1.632, 1.22, 0.718, 0.503, 0.749, 0.504, 0.74, 1.166, 1.088, 0.877, 1.118, 0.836, 0.323, 0.677, 0.021, -1.024, -0.86, -1.123, -1.218, -1.055, -0.865, -0.722, -1.099, -0.833, -0.564, -0.91, -0.523, -0.109, 0.042, -0.589, -0.119, -0.695, -1.318, -1.746, -1.273, -0.843, -0.061, -0.134, -0.238, 0.124, 0.958, 0.883, 0.789, 1.155, 0.857, 1.144, 0.59, 1.292, 1.506, 1.374, 0.905, 0.67, 0.273, 0.099, 0.074, -0.252, -0.136, 0.216, 0.394, -0.014, -0.041, 0.066, -0.134, -0.235, 0.117, 0.04, -0.242, -0.858, -0.704, -0.225, -0.033, 0.499, 0.234, -0.196, -0.3, -0.449, -0.099, 0.079, -0.075, 0.26, 0.015, -0.217, -0.347, -0.786, -0.865, -0.977, -0.818, -0.635, -0.672, -0.775, -0.864, -0.634, -0.631, -0.687, -0.704, -0.693, -0.709, -0.253, -0.407, -0.593, -0.872, -0.128, 0.199, 0.264, 0.232, 0.209, 0.431, 0.429, 0.617, 0.463, 0.288, 0.338, 0.142, 0.42, 0.207, 0.308, -0.152, -0.219, -0.261, -0.046, 0.485, 0.205, -0.043, 0.06, -0.088, -0.349, -0.168, -0.188, -0.029, -0.077, -0.51, -0.298, -0.365, -0.359, -0.591, -0.68, -0.313, -0.736, -0.676, -0.861, -0.899, -0.362, -0.535, -0.428, -0.303, 0.165, -0.03, -0.095, -0.116, -0.104, -0.108, 0.108, -0.094, -0.468, -0.815, -1.367, -1.499, -1.381, -0.815, -0.154, -0.544, -0.079, 0.165, 0.496, -0.13, -0.452, -0.957, -0.592, -0.872, -1.238, -1.091, -0.779, -0.587, -1.366, -1.414, -1.236, -1.771, -2.303, -2.136, -1.762, -1.187, -1.225, -1.174, -0.937, -0.491, -0.257, -0.421, -0.288, -0.325, -0.479, -0.616, -0.52, -0.582, -0.337, -1.04, -0.831, -0.108, 0.106, 0.06, -0.235, -0.391, 0.212, 0.148, -0.264, -0.596, -0.744, -0.598, -0.514, -0.339, -0.388, -0.246, -0.143, 0.047, 0.155, 0.084, 0.096, 0.041, -0.195, -0.356, -0.083, -0.485, -0.5, -0.234, -0.049, 0.21, 0.086, 0.172, -0.408, -0.706, -0.99, -0.48, -0.49, -0.828, -1.195, -1.461, -1.425, -0.63, -1.284, -1.374, -1.212, -1.294, -1.111, -0.654, -0.739, -0.604, -0.619, -0.266, -0.464, -0.381, 0.057, 0.751, 0.882, 0.628, 0.479, 0.491, 0.393, 0.274, 0.169, 0.356, 0.246, 0.468, 0.811, 1.06, 0.737, 0.798, 0.922, 1.049, 1.952, 1.706, 0.569, -0.468, -0.632, 0.038, 0.436, 0.687, 0.541, 0.49, 1.055, 0.822, 0.961, 0.634, -0.214, -0.469, 0.447, -0.027, -0.109, 0.481, 0.487, 0.62, 0.804, 1.221, 1.228, 1.145, 0.73, 0.541, 0.206, 0.104, 0.288, 0.307, 0.043, -0.242, 0.216, 0.029, -0.139, -0.013, 0.192, 0.038, -0.25, 0.101, -0.084, 0.134, 0.179, 0.062, 0.298, 0.179, 0.501, 0.258, 0.048, -0.076, -0.103, 0.182, 0.254, 0.49, 0.541, 0.721, 1.161, 1.202, 0.789, 1.257, 2.614, 3.204, 4.045, 3.209, 1.368, 0.963, 0.993, 1.065, 1.477, 1.559, 1.632, 1.613, 1.174, 1.33, 1.24, 0.651, 0.445, 0.453, -0.444, -0.258, 0.37, 0.67, 0.785, 0.751, 0.452, 0.511, 0.24, -0.157, -0.728, -0.565, -0.906, -0.155, 0.589, 1.599, 1.638, 2.222, 1.539, 1.358, 1.886, 1.996, 2.404, 2.2, 2.057, 1.217, 1.518, 2.047, 1.156, 0.603, 0.824, 0.466, 1.004, 1.324, 0.797, 0.943, 1.456, 0.899, 0.153, -0.034, -0.313, -0.147, 0.114, 0.326, 0.215, 0.237, 0.198, -0.019, 0.018, 0.171, 0.066, 0.399, 0.344, 0.032, -0.412, -0.527, -0.88, -0.482, -1.177, -1.461, -1.558, -1.358, -0.771, -0.126, -0.261, -0.733, -0.813, -1.309, -0.858, -1.453, -1.225, -0.627, -0.263, -0.466, -0.073, 0.298, 0.19, 0.24, 0.524, 0.339, -0.208, -0.659, -0.524, -0.075, -0.849, -0.852, -0.901, -1.362, -1.476, -1.326, -1.352, -1.82, -1.719, -2.107, -1.776, -2.252, -2.091, -1.081, -0.804, -0.249, -0.242, -0.145, -0.269, -0.294, -0.685, -0.283, 0.015, 0.609, 0.667, 0.576, 0.636, 0.972, 0.848, 0.487, 0.34, 0.437, 0.422, 0.433, 0.162, 0.444, 0.105, 0.061, 0.388, 0.436, 0.332, 0.236, 0.255, 0.248, 0.139, -0.07, -0.201, -0.263, -0.793, -0.886, -0.743, -1.019, -0.928, -0.847, -0.991, -1.056, -1.119, -1.066, -1.244, -1.003, -0.625, -0.367, -0.526, -0.823, -0.379, -0.206, -0.31, -0.387, -0.177, 0.125, 0.62, 0.959, 0.962, 0.879, 1.081, 0.923, 0.965, 1.453, 1.516, 1.305, 1.024, 1.231, 0.992, 0.708, 0.358, -0.062, -0.128, 0.087, 0.285, 0.763, 0.909, 1.138, 0.757, 0.535, 0.72, 0.395, 0.225, 0.469, 0.276, 0.322, 0.227, 0.298, 0.482, 0.43, 0.322, 0.598, 0.706, 0.47, 0.397, 0.548, 0.887, 0.7, 0.766, 0.862, 1.099, 0.8, 1.221, 1.366, 0.846, 0.729, 0.417, 0.625, 0.722, 0.328, 0.299, 0.161, -0.098, -0.155, -0.016, 0.149, 0.271, 0.328, 0.229, -0.05, 0.148, 0.308, 0.414, 0.405, 0.49, -0.01, -0.254, -0.021, 0.053, 0.079, 0.144, -0.259, -0.35, -0.352, -0.492, -0.752, -0.565, -0.374, -0.394, -0.527, -0.698, -0.489, -0.246, -0.115, -0.17, -0.198, -0.331, -0.572, -0.333, 0.079, 0.195, -0.045, -0.038, -0.207, -0.253, -0.456, -0.36, -0.448, -0.374, -1.166, -1.188, -1.093, -1.314, -1.135, -1.04, -0.774, -0.957, -1.109, -0.668, -0.563, -0.49, -0.652, -0.681, -0.442, -0.353, -0.3, -0.073, -0.271, -0.499, -0.51, -0.625, -0.478, -0.191, 0.324, -0.032, -0.141, 0.081, 0.163, 0.088, -0.054, -0.062, 0.426, 0.328, 0.196, 0.416, 0.381, 0.486, 0.618, 0.793, 1.075, 0.888, 0.619, 0.537, 0.215, 0.107, -0.104, -0.047, -0.202, -0.357, -0.57, -0.514, -0.345, -0.219, 0.115, 0.42, -0.013, -0.257, -0.487, 0.07, 0.29, 0.094, -0.018, -0.04, -0.205, -0.26, -0.628, -1.117, -0.783, -0.477, -0.58, -0.465, -0.612, -0.325, -0.782, -0.852, -0.584, -0.225, -0.073, 0.131, -0.194, -0.594, -0.653, -0.65, -0.728, -0.758, -0.788, -1.594, -1.174, -1.084, -1.312, -1.524, -1.525, -1.43, -1.428, -1.483, -1.529, -1.365, -2.043, -2.693, -1.988, -1.868, -1.953, -1.984, -1.562, -1.55, -1.729, -1.52, -0.994, -1.482, -1.298, -1.51, -1.663, -1.54, -2.032, -1.634, -1.449, -1.21, -0.637, -0.056, -0.443, -0.879, -1.673, -1.728, -1.383, -1.292, -1.051, -1.316, -1.654, -1.814, -1.221, -1.012, -0.863, -0.502, -0.535, -0.673, -0.843, -0.126, 0.419, 0.214, -0.201, -0.211, -0.059, -0.359, -0.509, -0.547, -0.884, -0.273, -0.321, -0.241, -0.205, -0.594, -0.59, -0.785, -0.456, -0.585, -0.411, 0.088, -0.169, -0.049, 0.084, -0.674, -0.541, -0.318, 0.056, 0.478, 0.519, 0.016, -0.034, 0.299, 0.919, 1.019, 0.752, 0.198, -0.071, -0.425, -0.554, -0.29, 0.6, 0.294, 0.244, 0.146, 0.177, -0.37, -0.785, -0.405, -0.363, -0.158, -0.509, -0.101, 0.303, 1.437, 1.374, 0.601, 1.057, 0.43, 0.374, 0.864, 0.95, 0.832, 0.953, 0.763, 1.143, 0.983, 0.802, 0.732]};/*WIND_DATA_END*/
+
+const $ = (s, r=document) => r.querySelector(s);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const TAU = 2*Math.PI;
+let raf = null, timers = [];
+function stopAll(){ cancelAnimationFrame(raf); raf = null; timers.forEach(clearInterval); timers = []; }
+const rnd = (a,b,step=1) => a + step*Math.floor(Math.random()*((b-a)/step+1));
+const rms = y => Math.sqrt(y.reduce((s,v)=>s+v*v,0)/y.length);
+const sub = (a,b) => a.map((v,i)=>v-b[i]);
+const variance = y => { const m=y.reduce((s,v)=>s+v,0)/y.length; return y.reduce((s,v)=>s+(v-m)**2,0)/y.length; };
+
+/* ---------- drawing ---------- */
+function fit(c){ const r=c.getBoundingClientRect(), d=devicePixelRatio||1;
+  c.width=Math.round(r.width*d); c.height=Math.round(r.height*d);
+  const g=c.getContext('2d'); g.setTransform(d,0,0,d,0,0); return [g,r.width,r.height]; }
+
+function plot(c, series, opt={}){
+  const [g,w,h]=fit(c); const pad={l:38,r:8,t:8,b:opt.noAxis?6:24};
+  const n=series[0].y.length, tmax=opt.tmax||n;
+  let ymax=opt.ymax||Math.max(...series.flatMap(s=>s.y.map(Math.abs)))*1.08||1;
+  const X=i=>pad.l+(w-pad.l-pad.r)*i/(n-1), Y=v=>pad.t+(h-pad.t-pad.b)*(0.5-v/(2*ymax));
+  g.font='12px Barlow, Arial'; g.fillStyle=css('--muted'); g.strokeStyle=css('--line'); g.lineWidth=1;
+  if(!opt.noAxis){
+    const step=opt.tick||10;
+    for(let t=0;t<=tmax+1e-9;t+=step){ const x=pad.l+(w-pad.l-pad.r)*t/tmax;
+      g.beginPath(); g.moveTo(x,pad.t); g.lineTo(x,h-pad.b); g.stroke();
+      if(Math.round(t/step)%(opt.labelEvery||1)===0) g.fillText(t+' s',x-8,h-6); }
+  }
+  g.beginPath(); g.moveTo(pad.l,Y(0)); g.lineTo(w-pad.r,Y(0)); g.stroke();
+  if(opt.fillProduct){ const p=opt.fillProduct;
+    for(let i=0;i<n-1;i++){ g.fillStyle=p[i]>=0?'rgba(31,208,130,.35)':'rgba(153,0,0,.25)';
+      g.fillRect(X(i),Math.min(Y(0),Y(p[i])),X(i+1)-X(i)+0.5,Math.abs(Y(p[i])-Y(0))); } }
+  for(const s of series){ g.strokeStyle=s.color; g.lineWidth=s.width||2; g.beginPath();
+    s.y.forEach((v,i)=>i?g.lineTo(X(i),Y(v)):g.moveTo(X(i),Y(v))); g.stroke(); }
+  if(!opt.noAxis){ g.fillStyle=css('--muted'); g.fillText('u′ (m/s)',2,12); }
+}
+
+/* scene: eddies of the player's chosen sizes drifting past a mast */
+function scene(c, eddies, U){
+  stopAll(); const start=performance.now();
+  const draw=now=>{
+    const [g,w,h]=fit(c); const mPerPx=Math.max(4, Math.max(...eddies.map(e=>e.size),100)/ (h*0.42));
+    const t=(now-start)/1000*(reduceMotion?0:1)*6; // 6× real time
+    const mastX=w*0.72;
+    g.strokeStyle=css('--ink'); g.lineWidth=3; g.beginPath(); g.moveTo(mastX,h); g.lineTo(mastX,h*0.25); g.stroke();
+    g.fillStyle=css('--ink'); g.beginPath(); g.arc(mastX,h*0.25,5,0,TAU); g.fill();
+    eddies.forEach((e,k)=>{ const rpx=e.size/2/mPerPx, sp=e.size/mPerPx, off=(U*t/mPerPx)%sp;
+      const y=h*(0.5+(k? 0.12:-0.05));
+      g.strokeStyle=k?css('--red'):css('--blue'); g.lineWidth=2;
+      for(let x=-sp+off; x<w+sp; x+=sp){ g.globalAlpha=0.85; g.beginPath(); g.arc(x,y,Math.max(rpx,3),0,TAU); g.stroke();
+        const a=-(U*t/(e.size/2))*1.0 + x*0.0; g.beginPath(); g.arc(x+Math.cos(a)*rpx,y+Math.sin(a)*rpx,3,0,TAU); g.fill(); }
+      g.globalAlpha=1; });
+    const bar=100/mPerPx; g.fillStyle=css('--ink'); g.fillRect(12,h-16,bar,3); g.font='12px Barlow, Arial'; g.fillText('100 m',12,h-22);
+    g.fillText(`wind ${U} m/s →`, 12, 18);
+    raf=requestAnimationFrame(draw); };
+  raf=requestAnimationFrame(draw);
+}
+
+/* ---------- levels ---------- */
+const briefs = {
+1:'<strong>One eddy.</strong> A row of identical eddies is carried past the mast at 8 m/s. Grey is what the sonic measured. Find the eddy size and strength. Three shots and no preview, so work it out before you fire.',
+2:'<strong>Two eddies, then more wind.</strong> Two rows of eddies of different sizes. Four shots. Then the wind picks up and you predict what the sonic sees.',
+3:'<strong>Real wind.</strong> Ten minutes at Østerild, 103 m. Twelve eddy sizes, each with a strength and a position. You have 60 seconds to match it. Then ask the anemometer.',
+4:'<strong>Spot the real one.</strong> All three traces have exactly the same spectrum. One is Østerild, two are forged. Which is real? Vote, then reveal.'
+};
+
+function setLevel(l){
+  stopAll(); document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-current', String(+b.dataset.l===l)));
+  $('#brief').innerHTML=briefs[l]; history.replaceState(null,'','#level'+l);
+  ({1:level1,2:level2,3:level3,4:level4})[l]();
+}
+
+function sineTrain(size,amp,U,t,ph=0){ return t.map(x=>amp*Math.sin(TAU*U*x/size+ph)); }
+
+function level1(){
+  const U=8, dt=0.5, tmax=180, t=Array.from({length:tmax/dt+1},(_,i)=>i*dt);
+  const L=rnd(120,600,10), A=rnd(6,16)/10, target=sineTrain(L,A,U,t);
+  let shots=3, you=null, done=false;
+  $('#stage').innerHTML=`<canvas id="scene"></canvas><canvas id="trace"></canvas>
+   <div class="legend"><span><i style="background:${css('--target')}"></i>measured</span><span><i style="background:${css('--you')}"></i>your eddies</span></div>
+   <div class="controls">
+    <div class="field"><label for="sz">eddy size ℓ (m)</label><input id="sz" type="number" min="20" max="1500" step="10" value="300"></div>
+    <div class="field"><label for="am">strength (m/s): <output id="amo">1.0</output></label><input id="am" type="range" min="0" max="2" step="0.1" value="1"></div>
+    <button class="btn" id="fire">Fire</button><div class="shots" id="shots"></div></div>
+   <div class="feedback" id="fb"></div>`;
+  const draw=()=>plot($('#trace'),[{y:target,color:css('--target'),width:3}].concat(you?[{y:you,color:css('--you')}]:[]),{tmax,tick:10,labelEvery:3});
+  const pips=()=>$('#shots').innerHTML='shots '+[0,1,2].map(i=>`<b class="${i>=shots?'used':''}"></b>`).join('');
+  $('#am').oninput=e=>$('#amo').textContent=(+e.target.value).toFixed(1);
+  $('#sz').oninput=()=>scene($('#scene'),[{size:+$('#sz').value}],U);
+  $('#fire').onclick=()=>{ if(done) return; const s=+$('#sz').value, a=+$('#am').value; shots--; pips();
+    you=sineTrain(s,a,U,t); const err=rms(sub(you,target))/rms(target); draw();
+    if(err<0.3){ done=true; $('#fb').innerHTML=`<span class="good">Hit, ${Math.round(err*100)} % error.</span> ${'★'.repeat(shots+1)} The period was ${(L/U).toFixed(1)} s, so ℓ = U × period = ${L} m. <button class="btn secondary" onclick="setLevel(2)">Next level</button>`; }
+    else if(!shots){ done=true; $('#fb').innerHTML=`<span class="bad">Out of shots.</span> One crest every ${(L/U).toFixed(1)} s at 8 m/s means ℓ = 8 × ${(L/U).toFixed(1)} = ${L} m, strength ${A.toFixed(1)} m/s. <button class="btn secondary" onclick="setLevel(1)">Try a new eddy</button>`; }
+    else $('#fb').innerHTML=`<span class="bad">Miss, ${Math.round(err*100)} % error.</span> Look at where your crests drift away from the grey ones.`; };
+  pips(); draw(); scene($('#scene'),[{size:300}],U);
+}
+
+function level2(){
+  const U=8, dt=0.5, tmax=180, t=Array.from({length:tmax/dt+1},(_,i)=>i*dt);
+  const L1=rnd(300,640,20), L2=rnd(60,140,10), A1=rnd(8,15)/10, A2=rnd(4,8)/10;
+  const target=sineTrain(L1,A1,U,t).map((v,i)=>v+sineTrain(L2,A2,U,[t[i]])[0]);
+  let shots=4, you=null, stage='A';
+  $('#stage').innerHTML=`<canvas id="scene"></canvas><canvas id="trace"></canvas>
+   <div class="legend"><span><i style="background:${css('--target')}"></i>measured</span><span><i style="background:${css('--you')}"></i>your eddies</span></div>
+   <div id="ctl"></div><div class="feedback" id="fb"></div>`;
+  const draw=(tg,y)=>plot($('#trace'),[{y:tg,color:css('--target'),width:3}].concat(y?[{y,color:css('--you')}]:[]),{tmax,tick:10,labelEvery:3});
+  const setA=()=>{ $('#ctl').innerHTML=`<div class="controls">
+    <div class="field"><label for="s1">big eddy ℓ₁ (m)</label><input id="s1" type="number" step="10" value="400"></div>
+    <div class="field"><label for="a1">strength₁: <output id="o1">1.0</output></label><input id="a1" type="range" min="0" max="2" step="0.1" value="1"></div>
+    <div class="field"><label for="s2">small eddy ℓ₂ (m)</label><input id="s2" type="number" step="10" value="100"></div>
+    <div class="field"><label for="a2">strength₂: <output id="o2">0.5</output></label><input id="a2" type="range" min="0" max="2" step="0.1" value="0.5"></div>
+    <button class="btn" id="fire">Fire</button><div class="shots" id="shots">shots left: 4</div></div>`;
+    $('#a1').oninput=e=>$('#o1').textContent=(+e.target.value).toFixed(1);
+    $('#a2').oninput=e=>$('#o2').textContent=(+e.target.value).toFixed(1);
+    const sc=()=>scene($('#scene'),[{size:+$('#s1').value},{size:+$('#s2').value}],U);
+    $('#s1').oninput=sc; $('#s2').oninput=sc; sc();
+    $('#fire').onclick=()=>{ shots--; $('#shots').textContent='shots left: '+shots;
+      you=sineTrain(+$('#s1').value,+$('#a1').value,U,t).map((v,i)=>v+(+$('#a2').value)*Math.sin(TAU*U*t[i]/(+$('#s2').value)));
+      const err=rms(sub(you,target))/rms(target); draw(target,you);
+      if(err<0.3||!shots){ $('#fire').disabled=true;
+        $('#fb').innerHTML=(err<0.3?`<span class="good">Hit, ${Math.round(err*100)} % error.</span> `:`<span class="bad">Out of shots.</span> `)+
+        `The eddies were ${L1} m and ${L2} m. <button class="btn secondary" id="toB">The wind picks up</button>`;
+        $('#toB').onclick=setB; }
+      else $('#fb').innerHTML=`<span class="bad">Miss, ${Math.round(err*100)} % error.</span> Fix the big eddy first: it sets the slow swings.`; };
+  };
+  const setB=()=>{ stage='B'; const U2=14;
+    $('#ctl').innerHTML=`<div class="controls"><div class="field"><label for="pp">Same two eddies, wind now ${U2} m/s. Period of the big eddy at the sonic (s)?</label>
+      <input id="pp" type="number" step="0.5" value=""></div><button class="btn" id="commit">Commit</button></div>`;
+    $('#fb').textContent='Commit a number before you see the new trace.';
+    draw(target,null); scene($('#scene'),[{size:L1},{size:L2}],U);
+    $('#commit').onclick=()=>{ const p=+$('#pp').value; if(!p){ $('#fb').textContent='Type a number first.'; return; }
+      const truth=L1/U2, tg2=sineTrain(L1,A1,U2,t).map((v,i)=>v+A2*Math.sin(TAU*U2*t[i]/L2));
+      draw(tg2,null); scene($('#scene'),[{size:L1},{size:L2}],U2);
+      const ok=Math.abs(p-truth)/truth<0.1;
+      $('#fb').innerHTML=`${ok?'<span class="good">Right.</span>':'<span class="bad">Not quite.</span>'} ℓ₁ / U = ${L1} / ${U2} = ${truth.toFixed(1)} s (it was ${(L1/U).toFixed(1)} s at ${U} m/s). Same eddies, faster wind: shorter periods. <button class="btn secondary" onclick="setLevel(3)">Next level</button>`;
+      $('#commit').disabled=true; };
+  };
+  draw(target,null); setA();
+}
+
+/* level 3: real wind, 12 harmonics of the 600 s record */
+const NS=[1,2,3,4,6,8,12,16,24,32,48,64];
+function level3(){
+  const u=WIND.u, N=u.length, Trec=N/WIND.fs, t=u.map((_,i)=>i/WIND.fs), U=WIND.U;
+  const amp=NS.map(()=>0), ph=NS.map(()=>0);
+  let left=60, running=false, locked=false;
+  $('#stage').innerHTML=`<canvas id="trace"></canvas>
+   <div class="legend"><span><i style="background:${css('--target')}"></i>Østerild u′</span><span><i style="background:${css('--you')}"></i>your 12 eddies</span></div>
+   <div class="eq" id="eq">${NS.map((n,k)=>`<div class="band" id="b${k}"><span class="size">${Math.round(U*Trec/n)}</span><span class="unit">m</span>
+     <input class="amp" type="range" min="0" max="1.2" step="0.02" value="0" aria-label="strength of ${Math.round(U*Trec/n)} m eddies" data-k="${k}">
+     <input class="ph" type="range" min="0" max="360" step="5" value="0" aria-label="position of ${Math.round(U*Trec/n)} m eddies" data-k="${k}"><span class="phl">position</span></div>`).join('')}</div>
+   <div class="row"><span class="timer" id="tm">60</span><span class="score" id="sc">variance matched: 0 %</span>
+     <button class="btn secondary" id="giveup">Stop the clock</button><button class="btn" id="anemo" disabled>Ask the anemometer</button></div>
+   <div class="feedback" id="fb">Big eddies on the left, small on the right. Each bar is one eddy size; its slider below shifts where its crests sit.</div>`;
+  const mix=()=>t.map(x=>NS.reduce((s,n,k)=>s+amp[k]*Math.cos(TAU*n*x/Trec-ph[k]*Math.PI/180),0));
+  const score=y=>1-variance(sub(u,y))/variance(u);
+  const draw=(extra=[],opt={})=>{ const y=mix(); plot($('#trace'),[{y:u,color:css('--target'),width:1.2},{y,color:css('--you'),width:2.2}].concat(extra),{tmax:600,tick:60,...opt});
+    $('#sc').textContent=`variance matched: ${Math.round(100*score(y))} %`; return y; };
+  const lock=()=>{ locked=true; stopAll(); document.querySelectorAll('.eq input').forEach(i=>i.disabled=true);
+    $('#anemo').disabled=false; $('#giveup').disabled=true; const s=score(mix());
+    $('#fb').innerHTML=`Your score: <b>${Math.round(100*s)} %</b>. Write it down. Now let the anemometer try, with the same 12 eddy sizes.`; };
+  $('#eq').oninput=e=>{ if(locked) return; const k=+e.target.dataset.k;
+    if(e.target.classList.contains('amp')) amp[k]=+e.target.value; else ph[k]=+e.target.value;
+    if(!running){ running=true; timers.push(setInterval(()=>{ left--; $('#tm').textContent=left; if(left<=0) lock(); },1000)); }
+    draw(); };
+  $('#giveup').onclick=lock;
+  $('#anemo').onclick=async ()=>{ $('#anemo').disabled=true; const yours=Math.round(100*score(mix()));
+    for(let k=0;k<NS.length;k++){
+      const n=NS[k], c=t.map(x=>Math.cos(TAU*n*x/Trec)), s=t.map(x=>Math.sin(TAU*n*x/Trec));
+      const dot=(a,b)=>a.reduce((S,v,i)=>S+v*b[i],0);
+      const a=dot(u,c)/dot(c,c), b=dot(u,s)/dot(s,s);
+      document.querySelectorAll('.band').forEach(el=>el.classList.remove('active')); $('#b'+k).classList.add('active');
+      $('#fb').innerHTML=`${Math.round(U*Trec/n)} m eddies: multiply the wind by a wave with ${n} period${n>1?'s':''} in 10 min and add up the shaded area. Green counts plus, red counts minus. Then do it again with the wave shifted a quarter period.`;
+      plot($('#trace'),[{y:u,color:css('--target'),width:1.2},{y:c.map(v=>v*Math.max(...u.map(Math.abs))*0.6),color:css('--blue'),width:1.5}],{tmax:600,tick:60,fillProduct:u.map((v,i)=>v*c[i])});
+      await new Promise(r=>setTimeout(r,reduceMotion?150:(k<3?1500:500)));
+      amp[k]=Math.hypot(a,b); ph[k]=(Math.atan2(b,a)*180/Math.PI+360)%360;
+      $(`#b${k} .amp`).value=amp[k]; $(`#b${k} .ph`).value=ph[k];
+    }
+    document.querySelectorAll('.band').forEach(el=>el.classList.remove('active'));
+    const best=Math.round(100*score(draw()));
+    $('#fb').innerHTML=`The anemometer: <b>${best} %</b> with 12 sizes. You: <b>${yours} %</b>. Ten minutes at 20 Hz allows 6000 sizes. How many would you need for 90 %? That is Round 1.`;
+  };
+  draw();
+}
+
+/* level 4: same spectrum, random phases */
+function dft(x){ const N=x.length, re=new Float64Array(N), im=new Float64Array(N);
+  for(let k=0;k<=N/2;k++){ let r=0,i=0; for(let n=0;n<N;n++){ const a=-TAU*k*n/N; r+=x[n]*Math.cos(a); i+=x[n]*Math.sin(a);} re[k]=r; im[k]=i; } return [re,im]; }
+function forge(u){ const N=u.length, [re,im]=dft(u), out=new Float64Array(N);
+  const A=[], P=[]; for(let k=1;k<=N/2;k++){ A.push(Math.hypot(re[k],im[k])*(k===N/2?1:2)/N); P.push(Math.random()*TAU); }
+  for(let n=0;n<N;n++){ let s=0; for(let k=1;k<=N/2;k++) s+=A[k-1]*Math.cos(TAU*k*n/N+P[k-1]); out[n]=s; } return Array.from(out); }
+function periodogram(x){ const N=x.length, [re,im]=dft(x), f=[], S=[];
+  for(let k=1;k<N/2;k++){ f.push(k*WIND.fs/N); S.push((re[k]**2+im[k]**2)*2/(N*N)); }
+  const sm=S.map((_,i)=>{ const a=Math.max(0,i-3), b=Math.min(S.length,i+4); return S.slice(a,b).reduce((p,q)=>p+q,0)/(b-a); });
+  return [f,sm]; }
+function level4(){
+  const u=WIND.u.slice(); const m=u.reduce((s,v)=>s+v,0)/u.length; const real=u.map(v=>v-m);
+  let traces, order, voted=false;
+  $('#stage').innerHTML=`<div class="suspects" id="sus"></div>
+    <div class="row"><button class="btn secondary" id="reveal">Reveal</button><button class="btn secondary" id="spec">Show the three spectra</button><button class="btn secondary" id="again">Forge again</button></div>
+    <canvas id="specs"></canvas><div class="feedback" id="fb">Click the trace you think is real.</div>`;
+  const build=()=>{ voted=false; traces=[real,forge(real),forge(real)]; order=[0,1,2].sort(()=>Math.random()-0.5);
+    $('#sus').innerHTML=order.map((k,j)=>`<button class="suspect" data-j="${j}"><span class="tag">${'ABC'[j]}</span><canvas></canvas></button>`).join('');
+    const ymax=Math.max(...traces.flatMap(y=>y.map(Math.abs)));
+    document.querySelectorAll('.suspect').forEach((b,j)=>{ plot($('canvas',b),[{y:traces[order[j]],color:css('--ink'),width:1.1}],{ymax,noAxis:true});
+      b.onclick=()=>{ document.querySelectorAll('.suspect').forEach(x=>x.classList.remove('picked')); b.classList.add('picked'); voted=j;
+        $('#fb').textContent=`You picked ${'ABC'[j]}. What made you pick it? Then reveal.`; }; });
+    $('#specs').style.display='none'; $('#fb').textContent='Click the trace you think is real.'; };
+  $('#reveal').onclick=()=>{ document.querySelectorAll('.suspect').forEach((b,j)=>b.classList.add(order[j]===0?'real':'fake'));
+    const jr=order.indexOf(0);
+    $('#fb').innerHTML=(voted===false?'':(order[voted]===0?'<span class="good">Caught it.</span> ':'<span class="bad">Fooled.</span> '))+
+      `${'ABC'[jr]} is Østerild. Same variance, same spectrum, same memory. The forgeries got the sizes right and the positions random, so their jumps are Gaussian. Did ${'ABC'[jr]} have a sharp ramp the others lack?`; };
+  $('#spec').onclick=()=>{ const c=$('#specs'); c.style.display='block'; const [g,w,h]=fit(c); const pad=40;
+    const all=traces.map(periodogram); const fmin=Math.log10(all[0][0][0]), fmax=Math.log10(all[0][0].at(-1));
+    const Sv=all.flatMap(a=>a[1]).filter(v=>v>0), smin=Math.log10(Math.min(...Sv)), smax=Math.log10(Math.max(...Sv));
+    const X=f=>pad+(w-pad-10)*(Math.log10(f)-fmin)/(fmax-fmin), Y=s=>10+(h-pad-10)*(1-(Math.log10(s)-smin)/(smax-smin));
+    g.fillStyle=css('--muted'); g.font='12px Barlow, Arial'; g.fillText('frequency (log) →',w/2-40,h-8); g.fillText('S (log)',4,14);
+    [css('--good'),css('--blue'),css('--red')].forEach((col,k)=>{ g.strokeStyle=col; g.lineWidth=k?1.5:2.5; g.beginPath();
+      all[k][0].forEach((f,i)=>{ const v=Math.max(all[k][1][i],1e-12); i?g.lineTo(X(f),Y(v)):g.moveTo(X(f),Y(v)); }); g.stroke(); });
+    g.fillText('green: real · blue, red: forgeries',w-220,14); };
+  $('#again').onclick=build; build();
+}
+
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>setLevel(+b.dataset.l));
+if(WIND.placeholder) $('#placeholder').hidden=false;
+const m=location.hash.match(/level(\d)/); setLevel(m?+m[1]:1);
+addEventListener('resize',()=>{ const l=+(location.hash.match(/level(\d)/)||[0,1])[1]; if(l===1||l===2) return; });
+</script>
+</body>
+</html>

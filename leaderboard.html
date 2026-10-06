@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Eddy Contact — class leaderboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{ --bg:#000; --ink:#FCFCFC; --gold:#F8B800; --dim:#7C7C7C; --green:#58D854; --red:#F83800;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){ --bg:#000; --ink:#FCFCFC; } }
+:root[data-theme="light"],:root[data-theme="dark"]{ --bg:#000; --ink:#FCFCFC; }
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Press Start 2P","Courier New",monospace;display:flex;flex-direction:column;align-items:center}
+h1{color:var(--gold);font-size:clamp(18px,3.4vw,44px);margin:3vh 0 1vh;text-align:center}
+.sub{color:var(--dim);font-size:clamp(9px,1.2vw,15px);margin-bottom:2vh;text-align:center}
+.grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:4vw;width:min(1400px,94vw)}
+ol{list-style:none;margin:0;padding:0;border:6px double var(--ink);padding:2vh 2vw}
+li{display:grid;grid-template-columns:3ch 1fr auto;gap:1.5ch;font-size:clamp(12px,2.1vw,30px);padding:.6vh 0}
+li .r{color:var(--dim)} li:nth-child(1) .n{color:var(--gold)} li:nth-child(2) .n,li:nth-child(3) .n{color:#BCBCBC}
+.side{display:flex;flex-direction:column;gap:3vh}
+.card{border:4px solid var(--ink);padding:2vh 1.5vw;font-size:clamp(9px,1.25vw,17px);line-height:1.9}
+.big{font-size:clamp(20px,3.6vw,52px);color:var(--green);margin:.5vh 0}
+.bar{height:3vh;background:#202020;border:3px solid var(--ink);margin-top:1vh}
+.bar i{display:block;height:100%;background:var(--red);width:0;transition:width .6s steps(10)}
+.bar.g i{background:var(--green)}
+.status{color:var(--dim);font-size:clamp(8px,1vw,12px);margin:2vh 0}
+@media (max-width:760px){ .grid{grid-template-columns:1fr} }
+@media (prefers-reduced-motion: reduce){ .bar i{transition:none} }
+</style>
+</head>
+<body>
+<h1>EDDY CONTACT · HIGH SCORES</h1>
+<div class="sub" id="sub"></div>
+<div class="grid">
+  <ol id="top"></ol>
+  <div class="side">
+    <div class="card">PLAYERS<div class="big" id="players">0</div></div>
+    <div class="card">FELL FOR THE STORM TRAP<br><span style="color:#BCBCBC">(sent the analyser's size at 16 m/s)</span>
+      <div class="big" id="trap">–</div><div class="bar"><i id="trapbar"></i></div></div>
+    <div class="card">PREDICTED "WEAKER" FOR SMALL EDDIES
+      <div class="big" id="weak">–</div><div class="bar g"><i id="weakbar"></i></div></div>
+  </div>
+</div>
+<div class="status" id="status"></div>
+<script>
+/* Same two settings as in the game. */
+const API_URL = '';
+const SESSION = new URLSearchParams(location.search).get('session') || 'L6-2026';
+
+const $ = id => document.getElementById(id);
+$('sub').textContent = `session ${SESSION} · updates every 5 s`;
+const pct = v => v == null ? '–' : Math.round(100 * v) + '%';
+async function refresh() {
+  if (!API_URL) { $('status').textContent = 'API_URL is not set: paste the Apps Script web-app address into this file.'; return; }
+  try {
+    const r = await fetch(`${API_URL}?session=${encodeURIComponent(SESSION)}`, { cache: 'no-store' });
+    const d = await r.json();
+    const top = d.top || [];
+    $('top').innerHTML = (top.length ? top : [{ name: 'waiting…', score: '' }]).map((p, i) =>
+      `<li><span class="r">${top.length ? i + 1 : ''}</span><span class="n"></span><span>${p.score}</span></li>`).join('');
+    [...$('top').querySelectorAll('.n')].forEach((el, i) => el.textContent = (top[i] || { name: 'waiting…' }).name);
+    $('players').textContent = d.players || 0;
+    $('trap').textContent = pct(d.trapShare) + (d.trapN ? ` of ${d.trapN}` : ''); $('trapbar').style.width = pct(d.trapShare === null ? 0 : d.trapShare);
+    $('weak').textContent = pct(d.finaleWeaker); $('weakbar').style.width = pct(d.finaleWeaker === null ? 0 : d.finaleWeaker);
+    $('status').textContent = 'last update ' + new Date().toLocaleTimeString();
+  } catch (e) { $('status').textContent = 'Could not reach the leaderboard. Retrying…'; }
+}
+refresh(); setInterval(refresh, 5000);
+</script>
+</body>
+</html>
