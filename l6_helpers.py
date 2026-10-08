@@ -1,7 +1,7 @@
 """
 Helpers for 46100 Micrometeorology, Lecture 6 (spectra).
 
-Only *mechanics* live here: loading data, smoothing, fitting, plotting, checks.
+Only *mechanics* live here: loading data, fitting, plotting, checks.
 The ideas students write themselves (the analyser, the FFT, the spectrum estimator)
 stay in the notebooks.
 
@@ -63,17 +63,6 @@ def size_bands(ell, var_modes, bands_per_decade=4):
 
 
 # ---- Round 2 ---------------------------------------------------------------------
-def log_smooth(omega, S, n=15):
-    """Average S in bins equally spaced in log10(omega), n bins per decade (the book's
-    'log-bin averaged spectrum'). Drops omega = 0."""
-    om, s = omega[omega > 0], S[omega > 0]
-    edges = 10 ** np.arange(np.floor(np.log10(om[0])), np.log10(om[-1]) + 1 / n, 1 / n)
-    idx = np.digitize(om, edges)
-    keep = np.unique(idx)
-    return (np.array([np.exp(np.log(om[idx == i]).mean()) for i in keep]),
-            np.array([s[idx == i].mean() for i in keep]))
-
-
 def fit_slope(omega, S, lo, hi):
     """Least-squares slope of log S vs log omega between lo and hi (rad/s)."""
     m = (omega >= lo) & (omega <= hi)
